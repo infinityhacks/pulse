@@ -1,7 +1,7 @@
 package digdroid
 
 //Package digdroid is Android and (maybe) iOS binding for running DNS test using pulse.
-//We don;t use pulse directly cause bind doesnt work with types such as interface{} and uint16
+//We don't use pulse directly cause bind doesnt work with types such as interface{} and uint16
 //gomobile bind github.com/turbobytes/pulse/digdroid
 
 import (

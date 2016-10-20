@@ -256,7 +256,7 @@ func (tracker *Tracker) UnRegister(worker *Worker) {
 func pingworker(worker *Worker) (err error) {
 	var reply bool
 	c := make(chan error, 1)
-	//We use this channel trikery to implement a timeout. If pinger doesnt respond in 10 seconds we kill the connection.
+	//We use this channel trikery to implement a timeout. If pinger doesn't respond in 10 seconds we kill the connection.
 	go func() {
 		c <- worker.Client.Call("Pinger.Ping", true, &reply)
 	}()

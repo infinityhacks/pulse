@@ -88,7 +88,7 @@ func versionsuicide() {
 	}
 }
 
-// expectedVersion gets the expected versoin that should be running
+// expectedVersion gets the expected version that should be running
 func expectedVersion() (string, error) {
 	resp, err := http.Get("https://tb-minion.turbobytes.net/latest")
 	if err != nil {
