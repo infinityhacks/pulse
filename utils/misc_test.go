@@ -8,9 +8,7 @@ import (
 func TestPublicIP(t *testing.T) {
 	cases_public := []string{"8.8.8.8", "74.125.130.100", "1.1.1.1", "45.45.45.45", "120.222.111.222", "2404:6800:4003:c01::64"}
 	for _, ipstr := range cases_public {
-		ip := net.ParseIP(ipstr)
-		v := islocalip(ip)
-		if v {
+		if islocalip(net.ParseIP(ipstr)) {
 			t.Error("Should be false for " + ipstr)
 		}
 	}
@@ -19,9 +17,7 @@ func TestPublicIP(t *testing.T) {
 func TestLocalIP(t *testing.T) {
 	cases_private := []string{"127.0.0.1", "10.5.6.4", "192.168.5.99", "100.66.55.66", "fd07:a47c:3742:823e:3b02:76:982b:463", "::1"}
 	for _, ipstr := range cases_private {
-		ip := net.ParseIP(ipstr)
-		v := islocalip(ip)
-		if !v {
+		if !islocalip(net.ParseIP(ipstr)) {
 			t.Error("Should be true for " + ipstr)
 		}
 	}
@@ -36,9 +32,7 @@ func TestOverrideSecurity(t *testing.T) {
 	//None of these should be security issue
 	cases_private := []string{"127.0.0.1", "10.5.6.4", "192.168.5.99", "100.66.55.66", "fd07:a47c:3742:823e:3b02:76:982b:463", "::1"}
 	for _, ipstr := range cases_private {
-		ip := net.ParseIP(ipstr)
-		v := islocalip(ip)
-		if v {
+		if islocalip(net.ParseIP(ipstr)) {
 			t.Errorf("Should be false for %s because we blanked it", ipstr)
 		}
 	}
@@ -47,9 +41,7 @@ func TestOverrideSecurity(t *testing.T) {
 	localipv6 = originallocalipv6
 	//Test again to see if we could restore it
 	for _, ipstr := range cases_private {
-		ip := net.ParseIP(ipstr)
-		v := islocalip(ip)
-		if !v {
+		if !islocalip(net.ParseIP(ipstr)) {
 			t.Error("Should be true for " + ipstr)
 		}
 	}
