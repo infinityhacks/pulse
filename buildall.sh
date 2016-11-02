@@ -39,6 +39,16 @@ do
 		fi
 	done
 done
+# Special build for linux/386 using old instruction set
+# https://github.com/golang/go/issues/5289
+# Let's call this arch 387
+GOOS="linux" GOARCH="386" GO386=387 go build -ldflags "$LDFLAGS" -o minion minion.go
+tar -czf "minion.linux.387.tar.gz" minion
+sha256sum "minion.linux.387.tar.gz" >  "minion.linux.387.tar.gz.sha256sum"
+gpg --default-key $KEY --output "minion.linux.387.tar.gz.sig" --detach-sig "minion.linux.387.tar.gz"
+rm minion
+
+
 /usr/local/bin/s3cmd --acl-public put  *.tar.gz* "s3://tb-minion/"
 rm *.tar.gz*
 echo $VERSION > latest
