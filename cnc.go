@@ -713,7 +713,7 @@ func main() {
 	flag.Parse()
 	cfg := pulse.GetTLSConfig(caFile, certificateFile, privateKeyFile)
 
-	listener, err := tls.Listen("tcp", ":7777", cfg)
+	listener, err := tls.Listen("tcp4", ":7777", cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
