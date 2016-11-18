@@ -23,12 +23,14 @@ import (
 	"github.com/abh/geoip"
 	"github.com/miekg/dns"
 	"github.com/sajal/mtrparser"
+	"github.com/turbobytes/geoipdb"
 	"github.com/turbobytes/pulse/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 //type Resolver int
+var geo geoipdb.Handler
 var gia *geoip.GeoIP
 var session *mgo.Session
 
@@ -121,29 +123,6 @@ type Worker struct {
 	Connected    bool
 }
 
-func getasn(ip string) (*string, *string) {
-	asntmp, _ := gia.GetName(ip)
-	if asntmp != "" {
-		splitted := strings.SplitN(asntmp, " ", 2)
-		if len(splitted) == 1 {
-			orgdata, err := pulse.IpInfoOrg(ip)
-			if err == nil {
-				splitted = strings.SplitN(orgdata, " ", 2)
-			}
-		}
-		if len(splitted) == 1 {
-			asn, err := pulse.LookupASN(splitted[0])
-			if err == nil {
-				return &splitted[0], &asn
-			}
-			return &splitted[0], nil
-		} else if len(splitted) == 2 {
-			return &splitted[0], &splitted[1]
-		}
-	}
-	return nil, nil
-}
-
 func populatedata(w *Worker, insertfirst bool) {
 	c := session.DB("dnsdist").C("agents")
 	agent := new(AgentInfo)
@@ -199,9 +178,12 @@ func NewWorker(conn net.Conn) *Worker {
 	if !ok {
 		log.Println("Not TLS Conn")
 	} else {
-		w.ASN, w.ASName = getasn(w.IP)
-
-		err := pingworker(w) //Ping in beginning to make sure we can talk and trigger handshake
+		var err error
+		w.ASN, w.ASName, err = pulse.LookupAsn(geo, w.IP)
+		if err != nil {
+			log.Printf("warning: failed to lookup ASN for %s: %s\n", w.IP, err)
+		}
+		err = pingworker(w) //Ping in beginning to make sure we can talk and trigger handshake
 		if err == nil {
 			state := tlsconn.ConnectionState()
 			if len(state.PeerCertificates) > 0 {
@@ -669,7 +651,11 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 	for i, res := range results {
 		result, _ := res.Result.(pulse.DNSResult)
 		for j, item := range result.Results {
-			item.ASN, item.ASName = getasn(item.Server)
+			var err error
+			item.ASN, item.ASName, err = pulse.LookupAsn(geo, item.Server)
+			if err != nil {
+				log.Printf("warning: failed to lookup ASN for %s: %s\n", item.Server, err)
+			}
 			msg := &dns.Msg{}
 			msg.Unpack(item.Raw)
 			item.Formated = msg.String()
@@ -700,6 +686,11 @@ func main() {
 		log.Fatal("mongo ", err)
 	}
 	defer session.Close()
+
+	geo, err = geoipdb.NewHandler(time.Second * 5)
+	if err != nil {
+		log.Fatalf("failed to get a geoipdb handler: %s", err)
+	}
 
 	gia, err = geoip.OpenType(geoip.GEOIP_ASNUM_EDITION)
 	if err != nil {
