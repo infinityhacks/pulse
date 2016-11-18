@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abh/geoip"
 	"github.com/miekg/dns"
 	"github.com/sajal/mtrparser"
 	"github.com/turbobytes/geoipdb"
@@ -31,7 +30,6 @@ import (
 
 //type Resolver int
 var geo geoipdb.Handler
-var gia *geoip.GeoIP
 var session *mgo.Session
 
 //AgentInfo is what we store in db...
@@ -539,28 +537,22 @@ func agentshandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getasnmtr(ip string, gia *geoip.GeoIP) string {
-	asntmp, _ := gia.GetName(ip)
-	if asntmp != "" {
-		splitted := strings.SplitN(asntmp, " ", 2)
-		if len(splitted) == 2 {
-			return splitted[0]
-		}
-	}
-	return ""
-}
-
 func repopulatehandler(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Type", "application/json")
 	tracker.Repopulate()
 	w.Write([]byte("DONE"))
 }
 
-func ResolveASNMtr(hop *mtrparser.MtrHop, gia *geoip.GeoIP) {
+func ResolveASNMtr(hop *mtrparser.MtrHop) {
 	hop.ASN = make([]string, len(hop.IP))
 	for idx, ip := range hop.IP {
 		//TODO...
-		hop.ASN[idx] = getasnmtr(ip, gia)
+		asn, descr, err := geo.LookupAsn(ip)
+		if err != nil {
+			hop.ASN[idx] = err.Error()
+			continue
+		}
+		hop.ASN[idx] = asn + " " + descr
 	}
 }
 
@@ -595,7 +587,7 @@ func runmtr(w http.ResponseWriter, r *http.Request) {
 				go func() {
 					defer wg.Done()
 					for _, hop := range result.Result.Hops {
-						ResolveASNMtr(hop, gia)
+						ResolveASNMtr(hop)
 					}
 					result.Result.Summarize(10)
 				}()
@@ -690,11 +682,6 @@ func main() {
 	geo, err = geoipdb.NewHandler(time.Second * 5)
 	if err != nil {
 		log.Fatalf("failed to get a geoipdb handler: %s", err)
-	}
-
-	gia, err = geoip.OpenType(geoip.GEOIP_ASNUM_EDITION)
-	if err != nil {
-		log.Fatal("Could not open GeoIP database\n")
 	}
 
 	var caFile, certificateFile, privateKeyFile string
