@@ -537,6 +537,15 @@ func agentshandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getasnmtr(ip string) string {
+	asn, _, err := geo.LookupAsn(ip)
+	if err != nil {
+		log.Printf("warning: asn lookup error for %s: %s\n", ip, err)
+		return ""
+	}
+	return asn
+}
+
 func repopulatehandler(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Type", "application/json")
 	tracker.Repopulate()
@@ -547,12 +556,7 @@ func ResolveASNMtr(hop *mtrparser.MtrHop) {
 	hop.ASN = make([]string, len(hop.IP))
 	for idx, ip := range hop.IP {
 		//TODO...
-		asn, descr, err := geo.LookupAsn(ip)
-		if err != nil {
-			hop.ASN[idx] = err.Error()
-			continue
-		}
-		hop.ASN[idx] = asn + " " + descr
+		hop.ASN[idx] = getasnmtr(ip)
 	}
 }
 
