@@ -24,17 +24,23 @@ func getfreeport() (int, error) {
 }
 
 func TestDNSImpl(t *testing.T) {
+	// Start mock server
 	port, err := getfreeport()
 	if err != nil {
 		t.Fatal(err)
 	}
 	mock := fmt.Sprintf("127.0.0.1:%d", port)
 	server := &dns.Server{Addr: mock, Net: "udp"}
+	wait := make(chan interface{})
 	go func() {
+		//t.Log("serving")
+		close(wait) // Signal start of goroutine
 		//Fail if any errors creating mock server
 		err := server.ListenAndServe()
 		t.Fatal(err)
 	}()
+	// Wait for server goroutine start
+	<-wait
 	//Setup handlers
 	//Always responds 1.1.1.1 and only to qtype A
 	dns.HandleFunc("foo.pulse.", func(w dns.ResponseWriter, r *dns.Msg) {
@@ -66,6 +72,7 @@ func TestDNSImpl(t *testing.T) {
 		NoRecursion: false,
 	}
 	//Run query
+	//t.Log("querying")
 	resp := DNSImpl(req)
 	//Perform checks
 	if resp.Err != "" {
