@@ -23,6 +23,10 @@ _testmain.go
 *.test
 *.prof
 
+# Temporary & backup files of text editors
+# vim swap files
+.*.swp
+
 #Dev certs in current directory
 ca.crt
 minion.crt

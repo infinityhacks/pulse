@@ -20,16 +20,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abh/geoip"
 	"github.com/miekg/dns"
 	"github.com/sajal/mtrparser"
+	"github.com/turbobytes/geoipdb"
 	"github.com/turbobytes/pulse/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 //type Resolver int
-var gia *geoip.GeoIP
+var geo geoipdb.Handler
 var session *mgo.Session
 
 //AgentInfo is what we store in db...
@@ -121,29 +121,6 @@ type Worker struct {
 	Connected    bool
 }
 
-func getasn(ip string) (*string, *string) {
-	asntmp, _ := gia.GetName(ip)
-	if asntmp != "" {
-		splitted := strings.SplitN(asntmp, " ", 2)
-		if len(splitted) == 1 {
-			orgdata, err := pulse.IpInfoOrg(ip)
-			if err == nil {
-				splitted = strings.SplitN(orgdata, " ", 2)
-			}
-		}
-		if len(splitted) == 1 {
-			asn, err := pulse.LookupASN(splitted[0])
-			if err == nil {
-				return &splitted[0], &asn
-			}
-			return &splitted[0], nil
-		} else if len(splitted) == 2 {
-			return &splitted[0], &splitted[1]
-		}
-	}
-	return nil, nil
-}
-
 func populatedata(w *Worker, insertfirst bool) {
 	c := session.DB("dnsdist").C("agents")
 	agent := new(AgentInfo)
@@ -188,6 +165,17 @@ func populatedata(w *Worker, insertfirst bool) {
 	w.FirstOnline = agent.FirstOnline
 }
 
+// lookupAsn is a wrapper around geoipdb.LookupAsn
+// that returns results as pointers
+func lookupAsn(ip string) (*string, *string) {
+	asn, descr, err := geo.LookupAsn(ip)
+	if err != nil {
+		log.Printf("warning: failed to lookup ASN for %s: %s\n", ip, err)
+		return nil, nil
+	}
+	return &asn, &descr
+}
+
 func NewWorker(conn net.Conn) *Worker {
 	w := &Worker{}
 	w.Client = rpc.NewClient(conn)
@@ -199,9 +187,9 @@ func NewWorker(conn net.Conn) *Worker {
 	if !ok {
 		log.Println("Not TLS Conn")
 	} else {
-		w.ASN, w.ASName = getasn(w.IP)
-
-		err := pingworker(w) //Ping in beginning to make sure we can talk and trigger handshake
+		var err error
+		w.ASN, w.ASName = lookupAsn(w.IP)
+		err = pingworker(w) //Ping in beginning to make sure we can talk and trigger handshake
 		if err == nil {
 			state := tlsconn.ConnectionState()
 			if len(state.PeerCertificates) > 0 {
@@ -557,15 +545,13 @@ func agentshandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getasnmtr(ip string, gia *geoip.GeoIP) string {
-	asntmp, _ := gia.GetName(ip)
-	if asntmp != "" {
-		splitted := strings.SplitN(asntmp, " ", 2)
-		if len(splitted) == 2 {
-			return splitted[0]
-		}
+func getasnmtr(ip string) string {
+	asn, _, err := geo.LookupAsn(ip)
+	if err != nil {
+		log.Printf("warning: asn lookup error for %s: %s\n", ip, err)
+		return ""
 	}
-	return ""
+	return asn
 }
 
 func repopulatehandler(w http.ResponseWriter, r *http.Request) {
@@ -574,11 +560,11 @@ func repopulatehandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("DONE"))
 }
 
-func ResolveASNMtr(hop *mtrparser.MtrHop, gia *geoip.GeoIP) {
+func ResolveASNMtr(hop *mtrparser.MtrHop) {
 	hop.ASN = make([]string, len(hop.IP))
 	for idx, ip := range hop.IP {
 		//TODO...
-		hop.ASN[idx] = getasnmtr(ip, gia)
+		hop.ASN[idx] = getasnmtr(ip)
 	}
 }
 
@@ -613,7 +599,7 @@ func runmtr(w http.ResponseWriter, r *http.Request) {
 				go func() {
 					defer wg.Done()
 					for _, hop := range result.Result.Hops {
-						ResolveASNMtr(hop, gia)
+						ResolveASNMtr(hop)
 					}
 					result.Result.Summarize(10)
 				}()
@@ -669,7 +655,7 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 	for i, res := range results {
 		result, _ := res.Result.(pulse.DNSResult)
 		for j, item := range result.Results {
-			item.ASN, item.ASName = getasn(item.Server)
+			item.ASN, item.ASName = lookupAsn(item.Server)
 			msg := &dns.Msg{}
 			msg.Unpack(item.Raw)
 			item.Formated = msg.String()
@@ -701,9 +687,9 @@ func main() {
 	}
 	defer session.Close()
 
-	gia, err = geoip.OpenType(geoip.GEOIP_ASNUM_EDITION)
+	geo, err = geoipdb.NewHandler(time.Second * 5)
 	if err != nil {
-		log.Fatal("Could not open GeoIP database\n")
+		log.Fatalf("failed to get a geoipdb handler: %s", err)
 	}
 
 	var caFile, certificateFile, privateKeyFile string
