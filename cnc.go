@@ -167,9 +167,13 @@ func populatedata(w *Worker, insertfirst bool) {
 
 // lookupAsn is a wrapper around geoipdb.LookupAsn
 // that returns results as pointers
-func lookupAsn(ip string) (*string, *string, error) {
+func lookupAsn(ip string) (*string, *string) {
 	asn, descr, err := geo.LookupAsn(ip)
-	return &asn, &descr, err
+	if err != nil {
+		log.Printf("warning: failed to lookup ASN for %s: %s\n", ip, err)
+		return nil, nil
+	}
+	return &asn, &descr
 }
 
 func NewWorker(conn net.Conn) *Worker {
@@ -184,10 +188,7 @@ func NewWorker(conn net.Conn) *Worker {
 		log.Println("Not TLS Conn")
 	} else {
 		var err error
-		w.ASN, w.ASName, err = lookupAsn(w.IP)
-		if err != nil {
-			log.Printf("warning: failed to lookup ASN for %s: %s\n", w.IP, err)
-		}
+		w.ASN, w.ASName = lookupAsn(w.IP)
 		err = pingworker(w) //Ping in beginning to make sure we can talk and trigger handshake
 		if err == nil {
 			state := tlsconn.ConnectionState()
@@ -654,11 +655,7 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 	for i, res := range results {
 		result, _ := res.Result.(pulse.DNSResult)
 		for j, item := range result.Results {
-			var err error
-			item.ASN, item.ASName, err = lookupAsn(item.Server)
-			if err != nil {
-				log.Printf("warning: failed to lookup ASN for %s: %s\n", item.Server, err)
-			}
+			item.ASN, item.ASName = lookupAsn(item.Server)
 			msg := &dns.Msg{}
 			msg.Unpack(item.Raw)
 			item.Formated = msg.String()
