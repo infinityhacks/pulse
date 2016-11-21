@@ -165,6 +165,13 @@ func populatedata(w *Worker, insertfirst bool) {
 	w.FirstOnline = agent.FirstOnline
 }
 
+// lookupAsn is a wrapper around geoipdb.LookupAsn
+// that returns results as pointers
+func lookupAsn(ip string) (*string, *string, error) {
+	asn, descr, err := geo.LookupAsn(ip)
+	return &asn, &descr, err
+}
+
 func NewWorker(conn net.Conn) *Worker {
 	w := &Worker{}
 	w.Client = rpc.NewClient(conn)
@@ -177,7 +184,7 @@ func NewWorker(conn net.Conn) *Worker {
 		log.Println("Not TLS Conn")
 	} else {
 		var err error
-		w.ASN, w.ASName, err = pulse.LookupAsn(geo, w.IP)
+		w.ASN, w.ASName, err = lookupAsn(w.IP)
 		if err != nil {
 			log.Printf("warning: failed to lookup ASN for %s: %s\n", w.IP, err)
 		}
@@ -648,7 +655,7 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 		result, _ := res.Result.(pulse.DNSResult)
 		for j, item := range result.Results {
 			var err error
-			item.ASN, item.ASName, err = pulse.LookupAsn(geo, item.Server)
+			item.ASN, item.ASName, err = lookupAsn(item.Server)
 			if err != nil {
 				log.Printf("warning: failed to lookup ASN for %s: %s\n", item.Server, err)
 			}
