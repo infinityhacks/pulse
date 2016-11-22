@@ -687,7 +687,7 @@ func main() {
 	}
 	defer session.Close()
 
-	geo, err = geoipdb.NewHandler(time.Second * 5)
+	geo, err = geoipdb.NewHandler(nil, time.Second * 5)
 	if err != nil {
 		log.Fatalf("failed to get a geoipdb handler: %s", err)
 	}
