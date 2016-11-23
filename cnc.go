@@ -672,13 +672,49 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
+// asndbHandler manages the asndb http endpoint
 func asndbHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("")
 	log.Println("asndbHandler()")
 	log.Printf("HTTP headers: %v\n", r.Header)
 	log.Printf("URL: %s", r.URL.Path)
-	w.Write([]byte("Hello ASN DB "))
-	w.Write([]byte(r.URL.Path))
+	args := strings.Split(r.URL.Path, "/")
+	log.Printf("args: %v, len %v", args, len(args))
+	switch len(args) {
+	case 0, 1, 2:
+		// this should never happen
+		httpInternalServerError(w, errors.New("empty asndb url"))
+	case 3:
+		if args[2] == "" {
+			// url: /asndb/
+			httpNotImplemented(w)
+		} else {
+			// url: /asndb/<asn>
+			httpNotImplemented(w)
+		}
+	default:
+		// url: /asndb/g/a/r/b/a/g/e
+		httpBadRequest(w)
+	}
+}
+
+// httpBadRequest returns http status code 400.
+func httpBadRequest(w http.ResponseWriter) {
+        http.Error(w, "400 Bad Request", http.StatusBadRequest)
+}
+
+// httpInternalServerError returns http status code 500.
+func httpInternalServerError(w http.ResponseWriter, err error) {
+	http.Error(
+		w,
+		"500 Internal Server Error\n" + err.Error(),
+		http.StatusInternalServerError,
+	)
+}
+
+// httpNotImplemented returns http status code 501.
+func httpNotImplemented(w http.ResponseWriter) {
+        http.Error(w, "501 Not Implemented", http.StatusNotImplemented)
 }
 
 func main() {
