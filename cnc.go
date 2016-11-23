@@ -471,7 +471,10 @@ func makeGzipHandler(fn http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 		}
 		if r.Method == "OPTIONS" {
-			return
+			// /asndb/ handles OPTIONS method
+			if strings.Index(r.URL.Path, asndbEndpoint) != 0 {
+				return
+			}
 		}
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			fn(w, r)
@@ -674,23 +677,39 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 
 // asndbHandler manages the asndb http endpoint
 func asndbHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("")
-	log.Println("asndbHandler()")
-	log.Printf("HTTP headers: %v\n", r.Header)
-	log.Printf("URL: %s", r.URL.Path)
 	args := strings.Split(r.URL.Path, "/")
-	log.Printf("args: %v, len %v", args, len(args))
 	switch len(args) {
 	case 0, 1, 2:
 		// this should never happen
 		httpInternalServerError(w, errors.New("empty asndb url"))
 	case 3:
-		if args[2] == "" {
+		asn := args[2]
+		if asn == "" {
 			// url: /asndb/
-			httpNotImplemented(w)
+			allowedMethods := []string{http.MethodOptions,http.MethodGet}
+			switch r.Method {
+			case http.MethodOptions:
+				httpSetAllowHeader(w, allowedMethods)
+			case http.MethodGet:
+				asndbGet(w)
+			default:
+				httpMethodNotAllowed(w, allowedMethods)
+			}
 		} else {
 			// url: /asndb/<asn>
-			httpNotImplemented(w)
+			allowedMethods := []string{http.MethodOptions,http.MethodGet, http.MethodPut, http.MethodDelete}
+			switch r.Method {
+			case http.MethodOptions:
+				httpSetAllowHeader(w, allowedMethods)
+			case http.MethodGet:
+				asndbGetAsn(w, asn)
+			case http.MethodPut:
+				asndbPutAsn(w, r, asn)
+			case http.MethodDelete:
+				asndbDeleteAsn(w, asn)
+			default:
+				httpMethodNotAllowed(w, allowedMethods)
+			}
 		}
 	default:
 		// url: /asndb/g/a/r/b/a/g/e
@@ -698,24 +717,61 @@ func asndbHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// httpBadRequest returns http status code 400.
-func httpBadRequest(w http.ResponseWriter) {
-        http.Error(w, "400 Bad Request", http.StatusBadRequest)
+// asndbGet answers all overrides collection.
+func asndbGet(w http.ResponseWriter) {
+	httpNotImplemented(w)
 }
 
-// httpInternalServerError returns http status code 500.
+// asndbGetAsn retrieves the override description of an ASN.
+func asndbGetAsn(w http.ResponseWriter, asn string) {
+	httpNotImplemented(w)
+}
+
+// asndbPutAsn stores an override description of an ASN.
+func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
+	httpNotImplemented(w)
+}
+
+// asndbDeleteAsn removes the override description of an ASN.
+func asndbDeleteAsn(w http.ResponseWriter, asn string) {
+	httpNotImplemented(w)
+}
+
+// httpBadRequest returns "bad request" http status.
+func httpBadRequest(w http.ResponseWriter) {
+	http.Error(w, "Bad Request", http.StatusBadRequest)
+}
+
+// httpMethodNotAllowed returns "method not allowed" http status.
+func httpMethodNotAllowed(w http.ResponseWriter, allowed []string) {
+	if len(allowed) == 0 {
+		httpNotImplemented(w)
+		return
+	}
+	httpSetAllowHeader(w, allowed)
+	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+}
+
+// httpInternalServerError returns "internal server error" http status.
 func httpInternalServerError(w http.ResponseWriter, err error) {
 	http.Error(
 		w,
-		"500 Internal Server Error\n" + err.Error(),
+		"Internal Server Error\n"+err.Error(),
 		http.StatusInternalServerError,
 	)
 }
 
-// httpNotImplemented returns http status code 501.
+// httpNotImplemented returns "not implemented" http status.
 func httpNotImplemented(w http.ResponseWriter) {
-        http.Error(w, "501 Not Implemented", http.StatusNotImplemented)
+	http.Error(w, "Not Implemented", http.StatusNotImplemented)
 }
+
+// httpSetAllowHeader sets the "Allow" http response header.
+func httpSetAllowHeader(w http.ResponseWriter, allowed []string) {
+	w.Header().Set("Allow", strings.Join(allowed, ", "))
+}
+
+const asndbEndpoint = "/asndb/"
 
 func main() {
 	gob.RegisterName("github.com/turbobytes/pulse/utils.MtrRequest", pulse.MtrRequest{})
@@ -734,7 +790,7 @@ func main() {
 
 	geo, err = geoipdb.NewHandler(
 		session.DB("dnsdist").C("geoipdb"),
-		time.Second * 5,
+		time.Second*5,
 	)
 	if err != nil {
 		log.Fatalf("failed to get a geoipdb handler: %s", err)
@@ -761,7 +817,7 @@ func main() {
 		http.HandleFunc("/mtr/", makeGzipHandler(runmtr))
 		http.HandleFunc("/agents/", makeGzipHandler(agentshandler))
 		http.HandleFunc("/repopulate/", makeGzipHandler(repopulatehandler))
-		http.HandleFunc("/asndb/", makeGzipHandler(asndbHandler))
+		http.HandleFunc(asndbEndpoint, makeGzipHandler(asndbHandler))
 
 		log.Fatal(http.ListenAndServe(":7778", nil))
 
