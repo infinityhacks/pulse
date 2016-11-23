@@ -672,6 +672,15 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
+func asndbHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("")
+	log.Println("asndbHandler()")
+	log.Printf("HTTP headers: %v\n", r.Header)
+	log.Printf("URL: %s", r.URL.Path)
+	w.Write([]byte("Hello ASN DB "))
+	w.Write([]byte(r.URL.Path))
+}
+
 func main() {
 	gob.RegisterName("github.com/turbobytes/pulse/utils.MtrRequest", pulse.MtrRequest{})
 	gob.RegisterName("github.com/turbobytes/pulse/utils.MtrResult", pulse.MtrResult{})
@@ -716,6 +725,7 @@ func main() {
 		http.HandleFunc("/mtr/", makeGzipHandler(runmtr))
 		http.HandleFunc("/agents/", makeGzipHandler(agentshandler))
 		http.HandleFunc("/repopulate/", makeGzipHandler(repopulatehandler))
+		http.HandleFunc("/asndb/", makeGzipHandler(asndbHandler))
 
 		log.Fatal(http.ListenAndServe(":7778", nil))
 
