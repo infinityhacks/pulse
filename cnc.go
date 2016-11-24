@@ -714,7 +714,7 @@ func asndbHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		// url: /asndb/g/a/r/b/a/g/e
-		httpBadRequest(w)
+		httpBadRequest(w, errors.New("Too many arguments"))
 	}
 }
 
@@ -758,7 +758,37 @@ func asndbGetAsn(w http.ResponseWriter, asn string) {
 
 // asndbPutAsn stores an override description of an ASN.
 func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
-	httpNotImplemented(w)
+	defer r.Body.Close()
+	cType := r.Header.Get("Content-Type")
+	if strings.Index(cType, "application/json") != 0 {
+		httpBadRequest(w, errors.New("unexpected content type"))
+		return
+	}
+	var override geoipdb.AsnOverride
+	err := json.NewDecoder(r.Body).Decode(&override)
+	if err != nil {
+		httpBadRequest(w, errors.New("malformed content: "+err.Error()))
+		return
+	}
+	override.Asn = asn
+	if override.Name == "" {
+		httpBadRequest(w, errors.New("empty name field"))
+		return
+	}
+	err = geo.OverridesSet(override.Asn, override.Name)
+	if err != nil {
+		if err == geoipdb.OverridesNilCollectionError {
+			httpNotAcceptable(w, errors.New("asndb features are disabled"))
+			return
+		}
+		if err == geoipdb.OverridesMalformedAsnError {
+			httpBadRequest(w, errors.New("malformed ASN id"))
+			return
+		}
+		httpInternalServerError(w, err)
+		return
+	}
+	httpSendJson(w, override)
 }
 
 // asndbDeleteAsn removes the override description of an ASN.
@@ -773,8 +803,12 @@ func httpSendJson(w http.ResponseWriter, data interface{}) error {
 }
 
 // httpBadRequest sends "bad request" http status.
-func httpBadRequest(w http.ResponseWriter) {
-	http.Error(w, "Bad Request", http.StatusBadRequest)
+func httpBadRequest(w http.ResponseWriter, err error) {
+	http.Error(
+		w,
+		"Bad Request\n"+err.Error(),
+		http.StatusBadRequest,
+	)
 }
 
 // httpNotFound sends "not found" http status.
