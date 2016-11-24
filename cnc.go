@@ -677,6 +677,7 @@ func runtest(w http.ResponseWriter, r *http.Request) {
 
 // asndbHandler manages the asndb http endpoint
 func asndbHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	args := strings.Split(r.URL.Path, "/")
 	switch len(args) {
 	case 0, 1, 2:
@@ -758,7 +759,6 @@ func asndbGetAsn(w http.ResponseWriter, asn string) {
 
 // asndbPutAsn stores an override description of an ASN.
 func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
-	defer r.Body.Close()
 	cType := r.Header.Get("Content-Type")
 	if strings.Index(cType, "application/json") != 0 {
 		httpBadRequest(w, errors.New("unexpected content type"))
@@ -793,7 +793,15 @@ func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
 
 // asndbDeleteAsn removes the override description of an ASN.
 func asndbDeleteAsn(w http.ResponseWriter, asn string) {
-	httpNotImplemented(w)
+	err := geo.OverridesRemove(asn)
+	if err != nil {
+		if err == geoipdb.OverridesNilCollectionError {
+			httpNotAcceptable(w, errors.New("asndb features are disabled"))
+			return
+		}
+		httpInternalServerError(w, err)
+		return
+	}
 }
 
 // httpSendJson sends an object as JSON.
