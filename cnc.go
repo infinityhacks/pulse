@@ -680,13 +680,14 @@ func asndbHandler(w http.ResponseWriter, r *http.Request) {
 	args := strings.Split(r.URL.Path, "/")
 	switch len(args) {
 	case 0, 1, 2:
-		// this should never happen
-		httpInternalServerError(w, errors.New("empty asndb url"))
+		// url: <nil> or '/' or '/asndb'
+		// this should never happen with http.HandleFunc()
+		httpInternalServerError(w, errors.New("unexpected asndb url"))
 	case 3:
 		asn := args[2]
 		if asn == "" {
 			// url: /asndb/
-			allowedMethods := []string{http.MethodOptions,http.MethodGet}
+			allowedMethods := []string{http.MethodOptions, http.MethodGet}
 			switch r.Method {
 			case http.MethodOptions:
 				httpSetAllowHeader(w, allowedMethods)
@@ -697,7 +698,7 @@ func asndbHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			// url: /asndb/<asn>
-			allowedMethods := []string{http.MethodOptions,http.MethodGet, http.MethodPut, http.MethodDelete}
+			allowedMethods := []string{http.MethodOptions, http.MethodGet, http.MethodPut, http.MethodDelete}
 			switch r.Method {
 			case http.MethodOptions:
 				httpSetAllowHeader(w, allowedMethods)
@@ -719,7 +720,20 @@ func asndbHandler(w http.ResponseWriter, r *http.Request) {
 
 // asndbGet answers all overrides collection.
 func asndbGet(w http.ResponseWriter) {
-	httpNotImplemented(w)
+	overrides, err := geo.OverridesList()
+	if err != nil {
+		if err == geoipdb.OverridesNilCollectionError {
+			httpNotAcceptable(w, errors.New("asndb features are disabled"))
+			return
+		}
+		httpInternalServerError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	err = json.NewEncoder(w).Encode(overrides)
+	if err != nil {
+		log.Printf("error: failed to encode asn overrides list: %s", err)
+	}
 }
 
 // asndbGetAsn retrieves the override description of an ASN.
@@ -750,6 +764,15 @@ func httpMethodNotAllowed(w http.ResponseWriter, allowed []string) {
 	}
 	httpSetAllowHeader(w, allowed)
 	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+}
+
+// httpNotAcceptable returns "not acceptable" http status.
+func httpNotAcceptable(w http.ResponseWriter, err error) {
+	http.Error(
+		w,
+		"Not Acceptable\n"+err.Error(),
+		http.StatusNotAcceptable,
+	)
 }
 
 // httpInternalServerError returns "internal server error" http status.
