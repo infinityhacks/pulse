@@ -729,16 +729,31 @@ func asndbGet(w http.ResponseWriter) {
 		httpInternalServerError(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	err = json.NewEncoder(w).Encode(overrides)
+	err = httpSendJson(w, overrides)
 	if err != nil {
-		log.Printf("error: failed to encode asn overrides list: %s", err)
+		log.Printf("error: failed to send overrides list: %s", err)
 	}
 }
 
 // asndbGetAsn retrieves the override description of an ASN.
 func asndbGetAsn(w http.ResponseWriter, asn string) {
-	httpNotImplemented(w)
+	descr, err := geo.OverridesLookup(asn)
+	if err != nil {
+		if err == geoipdb.OverridesNilCollectionError {
+			httpNotAcceptable(w, errors.New("asndb features are disabled"))
+			return
+		}
+		if err == geoipdb.OverridesAsnNotFoundError {
+			httpNotFound(w)
+			return
+		}
+		httpInternalServerError(w, err)
+		return
+	}
+	err = httpSendJson(w, geoipdb.AsnOverride{Asn: asn, Name: descr})
+	if err != nil {
+		log.Printf("error: failed to send override value: %s", err)
+	}
 }
 
 // asndbPutAsn stores an override description of an ASN.
@@ -751,12 +766,23 @@ func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 	httpNotImplemented(w)
 }
 
-// httpBadRequest returns "bad request" http status.
+// httpSendJson sends an object as JSON.
+func httpSendJson(w http.ResponseWriter, data interface{}) error {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	return json.NewEncoder(w).Encode(data)
+}
+
+// httpBadRequest sends "bad request" http status.
 func httpBadRequest(w http.ResponseWriter) {
 	http.Error(w, "Bad Request", http.StatusBadRequest)
 }
 
-// httpMethodNotAllowed returns "method not allowed" http status.
+// httpNotFound sends "not found" http status.
+func httpNotFound(w http.ResponseWriter) {
+	http.Error(w, "Not Found", http.StatusNotFound)
+}
+
+// httpMethodNotAllowed sends "method not allowed" http status.
 func httpMethodNotAllowed(w http.ResponseWriter, allowed []string) {
 	if len(allowed) == 0 {
 		httpNotImplemented(w)
@@ -766,7 +792,7 @@ func httpMethodNotAllowed(w http.ResponseWriter, allowed []string) {
 	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 }
 
-// httpNotAcceptable returns "not acceptable" http status.
+// httpNotAcceptable sends "not acceptable" http status.
 func httpNotAcceptable(w http.ResponseWriter, err error) {
 	http.Error(
 		w,
@@ -775,7 +801,7 @@ func httpNotAcceptable(w http.ResponseWriter, err error) {
 	)
 }
 
-// httpInternalServerError returns "internal server error" http status.
+// httpInternalServerError sends "internal server error" http status.
 func httpInternalServerError(w http.ResponseWriter, err error) {
 	http.Error(
 		w,
@@ -784,7 +810,7 @@ func httpInternalServerError(w http.ResponseWriter, err error) {
 	)
 }
 
-// httpNotImplemented returns "not implemented" http status.
+// httpNotImplemented sends "not implemented" http status.
 func httpNotImplemented(w http.ResponseWriter) {
 	http.Error(w, "Not Implemented", http.StatusNotImplemented)
 }
