@@ -938,7 +938,27 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 // asnlookupGetByIp queries several sources for ASN descriptions.
 // ASN lookup is done by IP address.
 func asnlookupGetByIp(w http.ResponseWriter, ip string) {
-	httpNotImplemented(w)
+	var answer AsnlookupResult
+	answer.Ip = ip
+	var err error
+	answer.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
+	if err != nil {
+		answer.Result.Geoipdb.Err = err.Error()
+	}
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
+	if err != nil {
+		answer.Result.Asndb.Err = err.Error()
+	}
+	answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+	if err != nil {
+		answer.Result.Cymru.Err = err.Error()
+	}
+	_, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
+	if err != nil {
+		answer.Result.Ipinfo.Err = err.Error()
+	}
+	_, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
+	httpSendJson(w, answer)
 }
 
 // httpSendJson sends an object as JSON.
