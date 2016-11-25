@@ -471,9 +471,14 @@ func makeGzipHandler(fn http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 		}
 		if r.Method == "OPTIONS" {
-			// /asndb/ handles OPTIONS method
-			if strings.Index(r.URL.Path, asndbEndpoint) != 0 {
-				return
+			switch {
+				default:
+					// default OPTIONS method handling
+					return
+				case strings.Index(r.URL.Path, asndbEndpoint) == 0:
+					// Let asndb handler deal with OPTIONS
+				case strings.Index(r.URL.Path, asnlookupEndpoint) == 0:
+					// Let asnlookup handler deal with OPTIONS
 			}
 		}
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -803,6 +808,11 @@ func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 		return
 	}
 }
+// asnlookupHandler manages the asnlookup http endpoint
+func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	httpNotImplemented(w)
+}
 
 // httpSendJson sends an object as JSON.
 func httpSendJson(w http.ResponseWriter, data interface{}) error {
@@ -862,7 +872,10 @@ func httpSetAllowHeader(w http.ResponseWriter, allowed []string) {
 	w.Header().Set("Allow", strings.Join(allowed, ", "))
 }
 
-const asndbEndpoint = "/asndb/"
+const (
+	asndbEndpoint = "/asndb/"
+	asnlookupEndpoint = "/asnlookup/"
+)
 
 func main() {
 	gob.RegisterName("github.com/turbobytes/pulse/utils.MtrRequest", pulse.MtrRequest{})
@@ -909,6 +922,7 @@ func main() {
 		http.HandleFunc("/agents/", makeGzipHandler(agentshandler))
 		http.HandleFunc("/repopulate/", makeGzipHandler(repopulatehandler))
 		http.HandleFunc(asndbEndpoint, makeGzipHandler(asndbHandler))
+		http.HandleFunc(asnlookupEndpoint, makeGzipHandler(asnlookupHandler))
 
 		log.Fatal(http.ListenAndServe(":7778", nil))
 
