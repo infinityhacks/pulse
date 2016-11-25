@@ -861,8 +861,39 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// url: /asnlookup/<lookupType>/<parameter>
-	// FIXME: handle http methods
-	_ = lookupType
+	allowedMethods := []string{http.MethodOptions, http.MethodGet}
+	switch r.Method {
+	case http.MethodOptions:
+		// OPTIONS /asnlookup/<lookupType>/<parameter>
+		httpSetAllowHeader(w, allowedMethods)
+		return
+	case http.MethodGet:
+		// GET /asnlookup/<lookupType>/<parameter>
+	default:
+		// _OTHER_METHOD_ /asnlookup/<lookupType>/<parameter>
+		httpMethodNotAllowed(w, allowedMethods)
+		return
+	}
+	// GET /asnlookup/<lookupType>/<parameter>
+	switch lookupType {
+	case asnlookupTypeASN:
+		asnlookupGetByAsn(w, parameter)
+	case asnlookupTypeIP:
+		asnlookupGetByIp(w, parameter)
+	default:
+		httpInternalServerError(w, errors.New("lookup type panic"))
+	}
+}
+
+// asnlookupGetByAsn queries several sources for ASN descriptions.
+// ASN lookup is done by ASN identifier.
+func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
+	httpNotImplemented(w)
+}
+
+// asnlookupGetByIp queries several sources for ASN descriptions.
+// ASN lookup is done by IP address.
+func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	httpNotImplemented(w)
 }
 
