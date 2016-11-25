@@ -918,17 +918,25 @@ type AsnlookupQueryResult struct {
 func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	var answer AsnlookupResult
 	answer.Asn = asn
-	// FIXME: fill ip. This may be possible after
-	// https://github.com/turbobytes/geoipdb/issues/18
+	// FIXME: fill IP field. This may be possible after
+	//     https://github.com/turbobytes/geoipdb/issues/18
+	// Query Cymru
+	cymru := make(chan interface{})
+	go func () {
+		var err error
+		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+		if err != nil {
+			answer.Result.Cymru.Err = err.Error()
+		}
+		close(cymru)
+	}()
 	var err error
-	answer.Result.Asndb.Name, err = geo.OverridesLookup(asn)
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
 	}
-	answer.Result.Cymru.Name, err = geo.CymruDnsLookup(asn)
-	if err != nil {
-		answer.Result.Cymru.Err = err.Error()
-	}
+	// Wait for external queries to finish
+	<-cymru
 	// FIXME: geoipdb lookup
 	// FIXME: ipinfo lookup
 	// FIXME: maxmind lookup
@@ -940,24 +948,43 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	var answer AsnlookupResult
 	answer.Ip = ip
+	// Query GeoIPDB, find ASN
 	var err error
 	answer.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
 	if err != nil {
 		answer.Result.Geoipdb.Err = err.Error()
 	}
+	// Query Cymru
+	cymru := make(chan interface{})
+	go func () {
+		var err error
+		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+		if err != nil {
+			answer.Result.Cymru.Err = err.Error()
+		}
+		close(cymru)
+	}()
+	// Query IPInfo
+	ipinfo := make(chan interface{})
+	go func() {
+		var err error
+		_, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
+		if err != nil {
+			answer.Result.Ipinfo.Err = err.Error()
+		}
+		close(ipinfo)
+	}()
+	// Query MaxMind
+	_, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
+	// Query AsnDB
 	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
 	}
-	answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
-	if err != nil {
-		answer.Result.Cymru.Err = err.Error()
-	}
-	_, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
-	if err != nil {
-		answer.Result.Ipinfo.Err = err.Error()
-	}
-	_, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
+	// Wait for external queries to finish
+	<-cymru
+	<-ipinfo
+	// Send results
 	httpSendJson(w, answer)
 }
 
