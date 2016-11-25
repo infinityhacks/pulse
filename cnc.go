@@ -472,13 +472,13 @@ func makeGzipHandler(fn http.HandlerFunc) http.HandlerFunc {
 		}
 		if r.Method == "OPTIONS" {
 			switch {
-				default:
-					// default OPTIONS method handling
-					return
-				case strings.Index(r.URL.Path, asndbEndpoint) == 0:
-					// Let asndb handler deal with OPTIONS
-				case strings.Index(r.URL.Path, asnlookupEndpoint) == 0:
-					// Let asnlookup handler deal with OPTIONS
+			default:
+				// default OPTIONS method handling
+				return
+			case strings.Index(r.URL.Path, asndbEndpoint) == 0:
+				// Let asndb handler deal with OPTIONS
+			case strings.Index(r.URL.Path, asnlookupEndpoint) == 0:
+				// Let asnlookup handler deal with OPTIONS
 			}
 		}
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -799,7 +799,7 @@ func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
 // types of lookups under /asnlookup/
 const (
 	asnlookupTypeASN = iota
-	asnlookupTypeIP = iota
+	asnlookupTypeIP  = iota
 )
 
 // asndbDeleteAsn removes the override description of an ASN.
@@ -814,6 +814,7 @@ func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 		return
 	}
 }
+
 // asnlookupHandler manages the asnlookup http endpoint
 func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
@@ -828,20 +829,20 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 	args = args[2:]
 	var lookupType int
 	switch args[0] {
-		case "":
-			// url: /asnlookup/
-			httpBadRequest(w, errors.New("missing lookup type"))
-			return
-		case "asn":
-			// url: /asnlookup/asn[/...]
-			lookupType = asnlookupTypeASN
-		case "ip":
-			// url: /asnlookup/ip[/...]
-			lookupType = asnlookupTypeIP
-		default:
-			// url: /asnlookup/_whatever_[/...]
-			httpBadRequest(w, errors.New("unexpected lookup type"))
-			return
+	case "":
+		// url: /asnlookup/
+		httpBadRequest(w, errors.New("missing lookup type"))
+		return
+	case "asn":
+		// url: /asnlookup/asn[/...]
+		lookupType = asnlookupTypeASN
+	case "ip":
+		// url: /asnlookup/ip[/...]
+		lookupType = asnlookupTypeIP
+	default:
+		// url: /asnlookup/_whatever_[/...]
+		httpBadRequest(w, errors.New("unexpected lookup type"))
+		return
 	}
 	if len(args) < 2 {
 		// url: /asnlookup/<lookupType>
@@ -885,10 +886,53 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// asnlookupResult is answered by /asnlookup/ endpoint.
+type AsnlookupResult struct {
+	// ASN identification
+	Asn string `json:"asn"`
+	// IP address
+	Ip     string `json:"ip"`
+	Result struct {
+		// MaxMind GeoIP
+		Maxmind AsnlookupQueryResult `json:"maxmind"`
+		// ipinfo.io IP lookup API
+		Ipinfo AsnlookupQueryResult `json:"ipinfo"`
+		// Team Cymru's DNS
+		Cymru AsnlookupQueryResult `json:"cymru"`
+		// Pulse ASN DB
+		Asndb AsnlookupQueryResult `json:"asndb"`
+		// TurboBytes geoipdb.LookupAsnP
+		Geoipdb AsnlookupQueryResult `json:"geoipdb"`
+	} `json:"result"`
+}
+
+type AsnlookupQueryResult struct {
+	// ASN description
+	Name string `json:"name"`
+	// status about query
+	Err string `json:"err"`
+}
+
 // asnlookupGetByAsn queries several sources for ASN descriptions.
 // ASN lookup is done by ASN identifier.
 func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
-	httpNotImplemented(w)
+	var answer AsnlookupResult
+	answer.Asn = asn
+	// FIXME: fill ip. This may be possible after
+	// https://github.com/turbobytes/geoipdb/issues/18
+	var err error
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(asn)
+	if err != nil {
+		answer.Result.Asndb.Err = err.Error()
+	}
+	answer.Result.Cymru.Name, err = geo.CymruDnsLookup(asn)
+	if err != nil {
+		answer.Result.Cymru.Err = err.Error()
+	}
+	// FIXME: geoipdb lookup
+	// FIXME: ipinfo lookup
+	// FIXME: maxmind lookup
+	httpSendJson(w, answer)
 }
 
 // asnlookupGetByIp queries several sources for ASN descriptions.
@@ -956,7 +1000,7 @@ func httpSetAllowHeader(w http.ResponseWriter, allowed []string) {
 }
 
 const (
-	asndbEndpoint = "/asndb/"
+	asndbEndpoint     = "/asndb/"
 	asnlookupEndpoint = "/asnlookup/"
 )
 
