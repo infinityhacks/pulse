@@ -796,6 +796,12 @@ func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
 	httpSendJson(w, override)
 }
 
+// types of lookups under /asnlookup/
+const (
+	asnlookupTypeASN = iota
+	asnlookupTypeIP = iota
+)
+
 // asndbDeleteAsn removes the override description of an ASN.
 func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 	err := geo.OverridesRemove(asn)
@@ -811,6 +817,52 @@ func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 // asnlookupHandler manages the asnlookup http endpoint
 func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	args := strings.Split(r.URL.Path, "/")
+	if len(args) < 3 {
+		// url: <nil> or '/' or '/asnlookup'
+		// this should never happen with http.HandleFunc()
+		httpInternalServerError(w, errors.New("unexpected asnlookup url"))
+		return
+	}
+	//url: /asnlookup/[...]
+	args = args[2:]
+	var lookupType int
+	switch args[0] {
+		case "":
+			// url: /asnlookup/
+			httpBadRequest(w, errors.New("missing lookup type"))
+			return
+		case "asn":
+			// url: /asnlookup/asn[/...]
+			lookupType = asnlookupTypeASN
+		case "ip":
+			// url: /asnlookup/ip[/...]
+			lookupType = asnlookupTypeIP
+		default:
+			// url: /asnlookup/_whatever_[/...]
+			httpBadRequest(w, errors.New("unexpected lookup type"))
+			return
+	}
+	if len(args) < 2 {
+		// url: /asnlookup/<lookupType>
+		httpBadRequest(w, errors.New("missing lookup parameter"))
+		return
+	}
+	args = args[1:]
+	parameter := args[0]
+	if parameter == "" {
+		// url: /asnlookup/<lookupType>/
+		httpBadRequest(w, errors.New("missing lookup parameter"))
+		return
+	}
+	if len(args) > 1 {
+		// url: /asnlookup/<lookupType>/<parameter>/[...]
+		httpBadRequest(w, errors.New("too many arguments"))
+		return
+	}
+	// url: /asnlookup/<lookupType>/<parameter>
+	// FIXME: handle http methods
+	_ = lookupType
 	httpNotImplemented(w)
 }
 
