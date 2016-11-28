@@ -916,10 +916,16 @@ type AsnlookupQueryResult struct {
 // asnlookupGetByAsn queries several sources for ASN descriptions.
 // ASN lookup is done by ASN identifier.
 func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
+	// Try finding an IP related to the given ASN.
+	ips := geo.LookupIp(asn)
+	if len(ips) > 0 {
+		// Found an IP
+		asnlookupGetByIp(w, ips[0])
+		return
+	}
+	// Fallback to lookups that allow by-asn queries.
 	var answer AsnlookupResult
 	answer.Asn = asn
-	// FIXME: fill IP field. This may be possible after
-	//     https://github.com/turbobytes/geoipdb/issues/18
 	// Query Cymru
 	cymru := make(chan interface{})
 	go func () {
@@ -937,9 +943,6 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	}
 	// Wait for external queries to finish
 	<-cymru
-	// FIXME: geoipdb lookup
-	// FIXME: ipinfo lookup
-	// FIXME: maxmind lookup
 	httpSendJson(w, answer)
 }
 
