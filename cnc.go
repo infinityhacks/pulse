@@ -997,18 +997,26 @@ func httpSendJson(w http.ResponseWriter, data interface{}) error {
 	return json.NewEncoder(w).Encode(data)
 }
 
+// httpStatus sends an HTTP status code and optional error message.
+func httpStatus(w http.ResponseWriter, code int, err error) {
+	msg := http.StatusText(code)
+	if err != nil {
+		if msg != "" {
+			msg += "\n"
+		}
+		msg += err.Error()
+	}
+	http.Error(w, msg, code)
+}
+
 // httpBadRequest sends "bad request" http status.
 func httpBadRequest(w http.ResponseWriter, err error) {
-	http.Error(
-		w,
-		"Bad Request\n"+err.Error(),
-		http.StatusBadRequest,
-	)
+	httpStatus(w, http.StatusBadRequest, err)
 }
 
 // httpNotFound sends "not found" http status.
 func httpNotFound(w http.ResponseWriter) {
-	http.Error(w, "Not Found", http.StatusNotFound)
+	httpStatus(w, http.StatusNotFound, nil)
 }
 
 // httpMethodNotAllowed sends "method not allowed" http status.
@@ -1018,30 +1026,22 @@ func httpMethodNotAllowed(w http.ResponseWriter, allowed []string) {
 		return
 	}
 	httpSetAllowHeader(w, allowed)
-	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	httpStatus(w, http.StatusMethodNotAllowed, nil)
 }
 
 // httpNotAcceptable sends "not acceptable" http status.
 func httpNotAcceptable(w http.ResponseWriter, err error) {
-	http.Error(
-		w,
-		"Not Acceptable\n"+err.Error(),
-		http.StatusNotAcceptable,
-	)
+	httpStatus(w, http.StatusNotAcceptable, err)
 }
 
 // httpInternalServerError sends "internal server error" http status.
 func httpInternalServerError(w http.ResponseWriter, err error) {
-	http.Error(
-		w,
-		"Internal Server Error\n"+err.Error(),
-		http.StatusInternalServerError,
-	)
+	httpStatus(w, http.StatusInternalServerError, err)
 }
 
 // httpNotImplemented sends "not implemented" http status.
 func httpNotImplemented(w http.ResponseWriter) {
-	http.Error(w, "Not Implemented", http.StatusNotImplemented)
+	httpStatus(w, http.StatusNotImplemented, nil)
 }
 
 // httpSetAllowHeader sets the "Allow" http response header.
