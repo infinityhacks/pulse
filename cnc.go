@@ -796,12 +796,6 @@ func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
 	httpSendJson(w, override)
 }
 
-// types of lookups under /asnlookup/
-const (
-	asnlookupTypeASN = iota
-	asnlookupTypeIP  = iota
-)
-
 // asndbDeleteAsn removes the override description of an ASN.
 func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 	err := geo.OverridesRemove(asn)
@@ -814,6 +808,12 @@ func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 		return
 	}
 }
+
+// types of lookups under /asnlookup/
+const (
+	asnlookupTypeASN = iota
+	asnlookupTypeIP  = iota
+)
 
 // asnlookupHandler manages the asnlookup http endpoint
 func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
@@ -888,9 +888,7 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 
 // asnlookupResult is answered by /asnlookup/ endpoint.
 type AsnlookupResult struct {
-	// ASN identification
-	Asn string `json:"asn"`
-	// IP address
+	// IP address used as parameter in by-IP queries
 	Ip     string `json:"ip"`
 	Result struct {
 		// MaxMind GeoIP
@@ -907,6 +905,8 @@ type AsnlookupResult struct {
 }
 
 type AsnlookupQueryResult struct {
+	// ASN identification
+	Asn string `json:"asn"`
 	// ASN description
 	Name string `json:"name"`
 	// status about query
@@ -925,19 +925,21 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	}
 	// Fallback to lookups that allow by-asn queries.
 	var answer AsnlookupResult
-	answer.Asn = asn
 	// Query Cymru
 	cymru := make(chan interface{})
 	go func () {
 		var err error
-		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+		answer.Result.Cymru.Asn = asn
+		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
 		if err != nil {
 			answer.Result.Cymru.Err = err.Error()
 		}
 		close(cymru)
 	}()
+	// Query ASN DB
 	var err error
-	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
+	answer.Result.Asndb.Asn = asn
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
 	}
@@ -951,9 +953,9 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	var answer AsnlookupResult
 	answer.Ip = ip
-	// Query GeoIPDB, find ASN
+	// Query GeoipDB
 	var err error
-	answer.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
+	answer.Result.Geoipdb.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
 	if err != nil {
 		answer.Result.Geoipdb.Err = err.Error()
 	}
@@ -961,7 +963,8 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	cymru := make(chan interface{})
 	go func () {
 		var err error
-		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+		answer.Result.Cymru.Asn = answer.Result.Geoipdb.Asn
+		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
 		if err != nil {
 			answer.Result.Cymru.Err = err.Error()
 		}
@@ -971,16 +974,17 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	ipinfo := make(chan interface{})
 	go func() {
 		var err error
-		_, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
+		answer.Result.Ipinfo.Asn, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
 		if err != nil {
 			answer.Result.Ipinfo.Err = err.Error()
 		}
 		close(ipinfo)
 	}()
 	// Query MaxMind
-	_, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
+	answer.Result.Maxmind.Asn, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
 	// Query AsnDB
-	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
+	answer.Result.Asndb.Asn = answer.Result.Geoipdb.Asn
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
 	}
