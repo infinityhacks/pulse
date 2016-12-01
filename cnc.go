@@ -796,12 +796,6 @@ func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
 	httpSendJson(w, override)
 }
 
-// types of lookups under /asnlookup/
-const (
-	asnlookupTypeASN = iota
-	asnlookupTypeIP  = iota
-)
-
 // asndbDeleteAsn removes the override description of an ASN.
 func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 	err := geo.OverridesRemove(asn)
@@ -814,6 +808,12 @@ func asndbDeleteAsn(w http.ResponseWriter, asn string) {
 		return
 	}
 }
+
+// types of lookups under /asnlookup/
+const (
+	asnlookupTypeASN = iota
+	asnlookupTypeIP  = iota
+)
 
 // asnlookupHandler manages the asnlookup http endpoint
 func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
@@ -888,9 +888,7 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 
 // asnlookupResult is answered by /asnlookup/ endpoint.
 type AsnlookupResult struct {
-	// ASN identification
-	Asn string `json:"asn"`
-	// IP address
+	// IP address used as parameter in by-IP queries
 	Ip     string `json:"ip"`
 	Result struct {
 		// MaxMind GeoIP
@@ -907,6 +905,8 @@ type AsnlookupResult struct {
 }
 
 type AsnlookupQueryResult struct {
+	// ASN identification
+	Asn string `json:"asn"`
 	// ASN description
 	Name string `json:"name"`
 	// status about query
@@ -916,30 +916,35 @@ type AsnlookupQueryResult struct {
 // asnlookupGetByAsn queries several sources for ASN descriptions.
 // ASN lookup is done by ASN identifier.
 func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
+	// Try finding an IP related to the given ASN.
+	ips := geo.LookupIp(asn)
+	if len(ips) > 0 {
+		// Found an IP
+		asnlookupGetByIp(w, ips[0])
+		return
+	}
+	// Fallback to lookups that allow by-asn queries.
 	var answer AsnlookupResult
-	answer.Asn = asn
-	// FIXME: fill IP field. This may be possible after
-	//     https://github.com/turbobytes/geoipdb/issues/18
 	// Query Cymru
 	cymru := make(chan interface{})
 	go func () {
 		var err error
-		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+		answer.Result.Cymru.Asn = asn
+		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
 		if err != nil {
 			answer.Result.Cymru.Err = err.Error()
 		}
 		close(cymru)
 	}()
+	// Query ASN DB
 	var err error
-	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
+	answer.Result.Asndb.Asn = asn
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
 	}
 	// Wait for external queries to finish
 	<-cymru
-	// FIXME: geoipdb lookup
-	// FIXME: ipinfo lookup
-	// FIXME: maxmind lookup
 	httpSendJson(w, answer)
 }
 
@@ -948,9 +953,9 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	var answer AsnlookupResult
 	answer.Ip = ip
-	// Query GeoIPDB, find ASN
+	// Query GeoipDB
 	var err error
-	answer.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
+	answer.Result.Geoipdb.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
 	if err != nil {
 		answer.Result.Geoipdb.Err = err.Error()
 	}
@@ -958,7 +963,8 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	cymru := make(chan interface{})
 	go func () {
 		var err error
-		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Asn)
+		answer.Result.Cymru.Asn = answer.Result.Geoipdb.Asn
+		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
 		if err != nil {
 			answer.Result.Cymru.Err = err.Error()
 		}
@@ -968,16 +974,17 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	ipinfo := make(chan interface{})
 	go func() {
 		var err error
-		_, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
+		answer.Result.Ipinfo.Asn, answer.Result.Ipinfo.Name, err = geo.IpInfoLookup(answer.Ip)
 		if err != nil {
 			answer.Result.Ipinfo.Err = err.Error()
 		}
 		close(ipinfo)
 	}()
 	// Query MaxMind
-	_, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
+	answer.Result.Maxmind.Asn, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
 	// Query AsnDB
-	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Asn)
+	answer.Result.Asndb.Asn = answer.Result.Geoipdb.Asn
+	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
 	}
@@ -994,18 +1001,26 @@ func httpSendJson(w http.ResponseWriter, data interface{}) error {
 	return json.NewEncoder(w).Encode(data)
 }
 
+// httpStatus sends an HTTP status code and optional error message.
+func httpStatus(w http.ResponseWriter, code int, err error) {
+	msg := http.StatusText(code)
+	if err != nil {
+		if msg != "" {
+			msg += "\n"
+		}
+		msg += err.Error()
+	}
+	http.Error(w, msg, code)
+}
+
 // httpBadRequest sends "bad request" http status.
 func httpBadRequest(w http.ResponseWriter, err error) {
-	http.Error(
-		w,
-		"Bad Request\n"+err.Error(),
-		http.StatusBadRequest,
-	)
+	httpStatus(w, http.StatusBadRequest, err)
 }
 
 // httpNotFound sends "not found" http status.
 func httpNotFound(w http.ResponseWriter) {
-	http.Error(w, "Not Found", http.StatusNotFound)
+	httpStatus(w, http.StatusNotFound, nil)
 }
 
 // httpMethodNotAllowed sends "method not allowed" http status.
@@ -1015,30 +1030,22 @@ func httpMethodNotAllowed(w http.ResponseWriter, allowed []string) {
 		return
 	}
 	httpSetAllowHeader(w, allowed)
-	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	httpStatus(w, http.StatusMethodNotAllowed, nil)
 }
 
 // httpNotAcceptable sends "not acceptable" http status.
 func httpNotAcceptable(w http.ResponseWriter, err error) {
-	http.Error(
-		w,
-		"Not Acceptable\n"+err.Error(),
-		http.StatusNotAcceptable,
-	)
+	httpStatus(w, http.StatusNotAcceptable, err)
 }
 
 // httpInternalServerError sends "internal server error" http status.
 func httpInternalServerError(w http.ResponseWriter, err error) {
-	http.Error(
-		w,
-		"Internal Server Error\n"+err.Error(),
-		http.StatusInternalServerError,
-	)
+	httpStatus(w, http.StatusInternalServerError, err)
 }
 
 // httpNotImplemented sends "not implemented" http status.
 func httpNotImplemented(w http.ResponseWriter) {
-	http.Error(w, "Not Implemented", http.StatusNotImplemented)
+	httpStatus(w, http.StatusNotImplemented, nil)
 }
 
 // httpSetAllowHeader sets the "Allow" http response header.

@@ -141,6 +141,66 @@ example :-
 * `Target` : The hostname/ip we want to trace to.
 * `IPv` : Optional. Set it to "4" or "6" to pass the `-4` or `-6` argument to mtr.
 
+#### ASN Lookup
+
+This is a service that queries internal and external databases for ASN information.
+
+- API endpoint (lookup by IP address): /asnlookup/ip/:IP
+- API endpoint (lookup by ASN identification): /asnlookup/asn/:ASN
+- Method: GET
+- Payload: Json object
+
+Example:
+
+	GET http://cnc.host.name:7778/asnlookup/ip/23.111.10.1
+
+	{	
+		"ip": "23.111.10.1",
+		"result": {
+			"asndb": {
+				"asn": "AS17025",
+				"err": "ASN not found",
+				"name": ""
+			},
+			"cymru": {
+				"asn": "AS17025",
+				"err": "",
+				"name": "ZAYO-CUSTOMER-17025 - Zayo Bandwidth Inc, US"
+			},
+			"geoipdb": {
+				"asn": "AS17025",
+				"err": "",
+				"name": "Abovenet Communications, Inc"
+			},
+			"ipinfo": {
+				"asn": "AS54104",
+				"err": "",
+				"name": "netDNA"
+			},
+			"maxmind": {
+				"asn": "AS17025",
+				"err": "",
+				"name": "Abovenet Communications, Inc"
+			}
+		}
+	}
+
+#### ASN DB
+
+This provides access to an internal database of ASN descriptions.
+
+List all entries
+
+- API endpoint: /asndb/
+- Method: GET
+- Payload: Json object
+
+Manipulate specific entry
+
+- API endpoint: /asndb/:ASN
+- Methods: GET, PUT, DELETE
+- Payload: Json object
+
 ## Create new test types
 
 coming soon...
