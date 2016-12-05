@@ -831,7 +831,7 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 	switch args[0] {
 	case "":
 		// url: /asnlookup/
-		httpBadRequest(w, errors.New("missing lookup type"))
+		asnlookupListCache(w)
 		return
 	case "asn":
 		// url: /asnlookup/asn[/...]
@@ -890,18 +890,20 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 type AsnlookupResult struct {
 	// IP address used as parameter in by-IP queries
 	Ip     string `json:"ip"`
-	Result struct {
-		// MaxMind GeoIP
-		Maxmind AsnlookupQueryResult `json:"maxmind"`
-		// ipinfo.io IP lookup API
-		Ipinfo AsnlookupQueryResult `json:"ipinfo"`
-		// Team Cymru's DNS
-		Cymru AsnlookupQueryResult `json:"cymru"`
-		// Pulse ASN DB
-		Asndb AsnlookupQueryResult `json:"asndb"`
-		// TurboBytes geoipdb.LookupAsnP
-		Geoipdb AsnlookupQueryResult `json:"geoipdb"`
-	} `json:"result"`
+	Result AsnlookupResultField `json:"result"`
+}
+
+type AsnlookupResultField struct {
+	// MaxMind GeoIP
+	Maxmind AsnlookupQueryResult `json:"maxmind"`
+	// ipinfo.io IP lookup API
+	Ipinfo AsnlookupQueryResult `json:"ipinfo"`
+	// Team Cymru's DNS
+	Cymru AsnlookupQueryResult `json:"cymru"`
+	// Pulse ASN DB
+	Asndb AsnlookupQueryResult `json:"asndb"`
+	// TurboBytes geoipdb.LookupAsnP
+	Geoipdb AsnlookupQueryResult `json:"geoipdb"`
 }
 
 type AsnlookupQueryResult struct {
@@ -911,6 +913,35 @@ type AsnlookupQueryResult struct {
 	Name string `json:"name"`
 	// status about query
 	Err string `json:"err"`
+}
+
+// asnlookupListCache sends a list of cached lookup results.
+// In each item of answer, only fiels 'Ip' and 'Result.Geoipdb' are filled.
+func asnlookupListCache(w http.ResponseWriter) {
+	asns := geo.AsnCacheList()
+	answer := make([]AsnlookupResult, 0)
+	for _, asn := range asns {
+		ips := geo.LookupIp(asn)
+		if len(ips) < 1 {
+			continue
+		}
+		ip := ips[0]
+		asn, descr, err := geo.LookupAsn(ip) // ip is cached
+		if err != nil {
+			continue
+		}
+		answer = append(answer, AsnlookupResult{
+			Ip: ip,
+			Result: AsnlookupResultField{
+				Geoipdb: AsnlookupQueryResult{
+					Asn: asn,
+					Name: descr,
+					Err: "",
+				},
+			},
+		})
+	}
+	httpSendJson(w, answer)
 }
 
 // asnlookupGetByAsn queries several sources for ASN descriptions.
