@@ -352,6 +352,20 @@ func slicecontainsbigint(num *big.Int, arr []*big.Int) bool {
 	return false
 }
 
+// LookupResolvers answers a list of resolvers
+// of all agents associated to a given ASN.
+func (tracker *Tracker) LookupResolvers(asn string) []string {
+	answer := make([]string, 0)
+	tracker.workerlock.RLock()
+	defer tracker.workerlock.RUnlock()
+	for _, w := range tracker.workers {
+		if w.ASN != nil && *w.ASN == asn {
+			answer = append(answer, w.Resolvers...)
+		}
+	}
+	return answer
+}
+
 func (tracker *Tracker) Runner(reqorg *pulse.CombinedRequest) []*pulse.CombinedResult {
 	tracker.workerlock.RLock()
 	defer tracker.workerlock.RUnlock()
@@ -947,11 +961,24 @@ func asnlookupListCache(w http.ResponseWriter) {
 // asnlookupGetByAsn queries several sources for ASN descriptions.
 // ASN lookup is done by ASN identifier.
 func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
-	// Try finding an IP related to the given ASN.
+	// We must find an IP address somewhere that belongs to the given AS.
+	// Try geoipdb cache...
 	ips := geo.LookupIp(asn)
 	if len(ips) > 0 {
 		// Found an IP
 		asnlookupGetByIp(w, ips[0])
+		return
+	}
+	// Look to tracker and cry for help...
+	ips = tracker.LookupResolvers(asn)
+	for _, ip := range ips {
+		asn_, _, err := geo.LookupAsn(ip)
+		if err != nil || asn_ != asn {
+			// Resolver IP does not match asn.
+			continue
+		}
+		// Found an IP
+		asnlookupGetByIp(w, ip)
 		return
 	}
 	// Fallback to lookups that allow by-asn queries.
