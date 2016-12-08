@@ -62,6 +62,33 @@ func TestCurlLocalBlock(t *testing.T) {
 	}
 }
 
+//Tests if fixipv6endpoint() is behaving correctly or not.
+func TestFixipv6endpoint(t *testing.T) {
+	//Test endpoints that should *not* be changed
+	valid_endpoints := []string{
+		"bar.foo.com",
+		"[bar.foo.com]",
+		"bar.foo.com:123",
+		"1.1.1.1",
+		"1.1.1.1:432",
+		"[2400:cb00:2048:1::c629:d7a2]:443",
+	}
+	for _, ep := range valid_endpoints {
+		fixed := fixipv6endpoint(ep)
+		if fixed != ep {
+			t.Errorf("%s should remain the same, got %s", ep, fixed)
+		}
+	}
+	//Test endpoints that should be changed
+	invalid_endpoints := map[string]string{"[2400:cb00:2048:1::c629:d7a2]": "[2400:cb00:2048:1::c629:d7a2]:443"}
+	for ep, expected := range invalid_endpoints {
+		fixed := fixipv6endpoint(ep)
+		if fixed != expected {
+			t.Errorf("%s should become %s, got %s", ep, expected, fixed)
+		}
+	}
+}
+
 // Timing tests require hitting an external url towards TurboBytes mock server.
 // Maybe this is not a good idea. Perhaps we need a local mocker.
 // Perhaps wait for https://go-review.googlesource.com/#/c/29440/ to land in release to help with local mock server.

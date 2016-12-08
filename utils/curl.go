@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"strings"
 	//	"log"
 	"math/big"
 	"net"
@@ -125,7 +126,28 @@ func dialContext(ctx context.Context, network, address string) (net.Conn, error)
 	return con, err
 }
 
+//fixipv6endpoint is a temporary workaround for issue #5
+//Currently http2 package does not handle IPv6 endpoint without port number correctly.
+//Only append port if input is in format "[IPv6]"
+func fixipv6endpoint(endpoint string) string {
+	_, _, err := net.SplitHostPort(endpoint)
+	if err == nil {
+		//endpoint is already in valid host:port format
+		return endpoint
+	}
+	//Figure out if input contains : or %
+	//Logic from https://golang.org/src/net/ipsock.go?s=5260:5303#L183
+	if strings.ContainsAny(endpoint, ":%") {
+		return endpoint + ":443"
+	}
+	return endpoint
+}
+
 func CurlImpl(r *CurlRequest) *CurlResult {
+	//Fix the endpoint, only when running https test
+	if r.Ssl {
+		r.Endpoint = fixipv6endpoint(r.Endpoint)
+	}
 	result := &CurlResult{}
 	var url string
 	if r.Ssl {
