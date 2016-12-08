@@ -366,6 +366,20 @@ func (tracker *Tracker) LookupResolvers(asn string) []string {
 	return answer
 }
 
+// LookupIp answers a list of IP addresses
+// of all agents associated to a given ASN.
+func (tracker *Tracker) LookupIp(asn string) []string {
+	answer := make([]string, 0)
+	tracker.workerlock.RLock()
+	defer tracker.workerlock.RUnlock()
+	for _, w := range tracker.workers {
+		if w.ASN != nil && *w.ASN == asn {
+			answer = append(answer, w.IP)
+		}
+	}
+	return answer
+}
+
 func (tracker *Tracker) Runner(reqorg *pulse.CombinedRequest) []*pulse.CombinedResult {
 	tracker.workerlock.RLock()
 	defer tracker.workerlock.RUnlock()
@@ -961,6 +975,7 @@ func asnlookupListCache(w http.ResponseWriter) {
 // asnlookupGetByAsn queries several sources for ASN descriptions.
 // ASN lookup is done by ASN identifier.
 func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
+	var err error
 	// We must find an IP address somewhere that belongs to the given AS.
 	// Try geoipdb cache...
 	ips := geo.LookupIp(asn)
@@ -969,7 +984,17 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 		asnlookupGetByIp(w, ips[0])
 		return
 	}
-	// Look to tracker and cry for help...
+	// Try agent IPs...
+	ips = tracker.LookupIp(asn)
+	for _, ip := range ips {
+		asn_, _, err := geo.LookupAsn(ip)
+		if err == nil && asn_ == asn {
+			// Found an IP
+			asnlookupGetByIp(w, ip)
+			return
+		}
+	}
+	// Try resolver IPs...
 	ips = tracker.LookupResolvers(asn)
 	for _, ip := range ips {
 		asn_, _, err := geo.LookupAsn(ip)
@@ -981,6 +1006,8 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 		asnlookupGetByIp(w, ip)
 		return
 	}
+	// Cannot discover an IP address that belongs to the given AS.
+	log.Printf("asnlookup: cannot find an ip for %s\n", asn)
 	// Fallback to lookups that allow by-asn queries.
 	var answer AsnlookupResult
 	// Query Cymru
@@ -995,7 +1022,6 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 		close(cymru)
 	}()
 	// Query ASN DB
-	var err error
 	answer.Result.Asndb.Asn = asn
 	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
