@@ -822,6 +822,7 @@ func asndbPutAsn(w http.ResponseWriter, r *http.Request, asn string) {
 		return
 	}
 	httpSendJson(w, override)
+	tracker.Repopulate()
 }
 
 // asndbDeleteAsn removes the override description of an ASN.
