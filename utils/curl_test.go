@@ -72,6 +72,7 @@ func TestFixipv6endpoint(t *testing.T) {
 		"1.1.1.1",
 		"1.1.1.1:432",
 		"[2400:cb00:2048:1::c629:d7a2]:443",
+		"2400:cb00:2048:1::c629:d7a2",
 	}
 	for _, ep := range valid_endpoints {
 		fixed := fixipv6endpoint(ep)

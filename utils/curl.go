@@ -136,9 +136,12 @@ func fixipv6endpoint(endpoint string) string {
 		return endpoint
 	}
 	//Figure out if input contains : or %
-	//Logic from https://golang.org/src/net/ipsock.go?s=5260:5303#L183
-	if strings.ContainsAny(endpoint, ":%") {
-		return endpoint + ":443"
+	//Logic from upstream bugfix https://github.com/golang/net/commit/e31bd588d1077ee66a958c0ad3a235f2084b4195
+	if strings.HasPrefix(endpoint, "[") && strings.HasSuffix(endpoint, "]") {
+		//Logic from https://golang.org/src/net/ipsock.go?s=5260:5303#L183
+		if strings.ContainsAny(endpoint, ":%") {
+			return endpoint + ":443"
+		}
 	}
 	return endpoint
 }
