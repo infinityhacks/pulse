@@ -25,9 +25,8 @@ func TestLocalIP(t *testing.T) {
 
 //TestOverrideSecurity demonstrates how to override security checks for testing purposes
 func TestOverrideSecurity(t *testing.T) {
-	originallocalipv4 := localipv4
+	// Disable detection of local IPs
 	localipv4 = []string{}
-	originallocalipv6 := localipv6
 	localipv6 = []string{}
 	//None of these should be security issue
 	cases_private := []string{"127.0.0.1", "10.5.6.4", "192.168.5.99", "100.66.55.66", "fd07:a47c:3742:823e:3b02:76:982b:463", "::1"}
@@ -37,8 +36,8 @@ func TestOverrideSecurity(t *testing.T) {
 		}
 	}
 	//Restore original behaviour
-	localipv4 = originallocalipv4
-	localipv6 = originallocalipv6
+	localipv4 = nil
+	localipv6 = nil
 	//Test again to see if we could restore it
 	for _, ipstr := range cases_private {
 		if !islocalip(net.ParseIP(ipstr)) {
