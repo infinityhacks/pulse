@@ -998,7 +998,7 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	// Try agent IPs...
 	ips = tracker.LookupIp(asn)
 	for _, ip := range ips {
-		asn_, _, err := LookupAsn(ip)
+		asn_, _, err := geo.LookupAsn(ip)
 		if err == nil && asn_ == asn {
 			// Found an IP
 			asnlookupGetByIp(w, ip)
@@ -1008,9 +1008,8 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	// Try resolver IPs...
 	ips = tracker.LookupResolvers(asn)
 	for _, ip := range ips {
-		asn_, _, err := LookupAsn(ip)
+		asn_, _, err := geo.LookupAsn(ip)
 		if err != nil || asn_ != asn {
-			// Resolver IP does not match asn.
 			continue
 		}
 		// Found an IP
@@ -1046,10 +1045,12 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 // asnlookupGetByIp queries several sources for ASN descriptions.
 // ASN lookup is done by IP address.
 func asnlookupGetByIp(w http.ResponseWriter, ip string) {
+	var err error
 	var answer AsnlookupResult
 	answer.Ip = ip
+	// Find ASN for this IP
+	asn, _, _ := geo.LookupAsn(ip)
 	// Query GeoipDB
-	var err error
 	answer.Result.Geoipdb.Asn, answer.Result.Geoipdb.Name, err = LookupAsn(answer.Ip)
 	if err != nil {
 		answer.Result.Geoipdb.Err = err.Error()
@@ -1058,7 +1059,7 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	cymru := make(chan interface{})
 	go func () {
 		var err error
-		answer.Result.Cymru.Asn = answer.Result.Geoipdb.Asn
+		answer.Result.Cymru.Asn = asn
 		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
 		if err != nil {
 			answer.Result.Cymru.Err = err.Error()
@@ -1078,7 +1079,7 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	// Query MaxMind
 	answer.Result.Maxmind.Asn, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
 	// Query AsnDB
-	answer.Result.Asndb.Asn = answer.Result.Geoipdb.Asn
+	answer.Result.Asndb.Asn = asn
 	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
