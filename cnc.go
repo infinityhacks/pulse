@@ -928,7 +928,7 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 // asnlookupResult is answered by /asnlookup/ endpoint.
 type AsnlookupResult struct {
 	// IP address used as parameter in by-IP queries
-	Ip     string `json:"ip"`
+	Ip     string               `json:"ip"`
 	Result AsnlookupResultField `json:"result"`
 }
 
@@ -973,9 +973,9 @@ func asnlookupListCache(w http.ResponseWriter) {
 			Ip: ip,
 			Result: AsnlookupResultField{
 				Geoipdb: AsnlookupQueryResult{
-					Asn: asn,
+					Asn:  asn,
 					Name: descr,
-					Err: "",
+					Err:  "",
 				},
 			},
 		})
@@ -1022,7 +1022,7 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	var answer AsnlookupResult
 	// Query Cymru
 	cymru := make(chan interface{})
-	go func () {
+	go func() {
 		var err error
 		answer.Result.Cymru.Asn = asn
 		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
@@ -1057,7 +1057,7 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	}
 	// Query Cymru
 	cymru := make(chan interface{})
-	go func () {
+	go func() {
 		var err error
 		answer.Result.Cymru.Asn = asn
 		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
