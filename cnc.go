@@ -171,7 +171,6 @@ func lookupAsn(ip string) (*string, *string) {
 	asn, descr, err := LookupAsn(ip)
 	if err != nil {
 		log.Printf("warning: failed to lookup ASN for %s: %s\n", ip, err)
-		return nil, nil
 	}
 	return &asn, &descr
 }
