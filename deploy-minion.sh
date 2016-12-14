@@ -1,7 +1,11 @@
 #!/bin/sh
-
-#Run this with OS and ARCH defined in enviornment....
-#OS="linux" ARCH="amd64" ./deploy-minion.sh  2>&1 | logger -t minion &
+#
+# Run minion in this host.
+# Usage:
+#    ./deploy-minion.sh 2>&1 | logget -t minion &
+#
+# OS and ARCH can be overridden by environment variables, eg:
+#    OS="linux" ARCH="amd64" ./deploy-minion.sh  2>&1 | logger -t minion &
 
 #Install GPG key if not present
 gpg --list-keys 24F6D50F
@@ -10,7 +14,7 @@ HASGPG=$?
 if [ $HASGPG -gt 0 ]
 then
 	#Key is not present.
-	echo "Installing Public key"
+	echo "Installing Public key" 1>&2
 	gpg --import <<EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v1.4.12 (GNU/Linux)
@@ -47,12 +51,12 @@ fi
 
 if [ $HASGPG -eq 0 ]
 then
-	echo "We will use GPG for veryfying tar downloads and not sha256sum"
+	echo "We will use GPG for verifying tar downloads and not sha256sum" 1>&2
 fi
 
 #Check if minion is latest or not...
 
-#Some autodetction for OS...
+#Some autodetection for OS...
 if [ "$OS" = "" ]; then
 	unamestr=`uname`
 	if [ "$unamestr" = 'Linux' ]; then
@@ -60,7 +64,7 @@ if [ "$OS" = "" ]; then
 	fi
 fi
 
-#Some autodetction for ARCH...
+#Some autodetection for ARCH...
 if [ "$ARCH" = "" ]; then
 	unamestr=`uname -m`
 	#Matches my laptop
@@ -82,13 +86,13 @@ if [ "$ARCH" = "" ]; then
 fi
 
 if [ "$OS" = "" ]; then
-	echo "Must provide enviornment variable OS"
+	echo "Cannot autodetect operating system; please provide environment variable OS" 1>&2
 	exit 1
 fi
 
 
 if [ "$ARCH" = "" ]; then
-	echo "Must provide enviornment variable ARCH"
+	echo "Cannot autodetect architecture; please provide environment variable ARCH" 1>&2
 	exit 1
 fi
 
@@ -97,7 +101,7 @@ SHAFILE="minion.$OS.$ARCH.tar.gz.sha256sum"
 GPGFILE="minion.$OS.$ARCH.tar.gz.sig"
 BASEURL="https://tb-minion.turbobytes.net/"
 
-echo "$TARFILE $SHAFILE"
+echo "minion for this system is: $TARFILE $SHAFILE" 1>&2
 #set -o xtrace
 while :
 do
@@ -121,7 +125,7 @@ do
 	if [ $comp_value -eq 1 ]
 	then
 		#Current did not match latest
-	    echo "need to upgrade..."
+	    echo "need to upgrade..." 1>&2
 	    curl -so "$TARFILE" "$BASEURL$TARFILE"
 	    curl -so "$SHAFILE" "$BASEURL$SHAFILE"
 	    curl -so "$GPGFILE" "$BASEURL$GPGFILE"
@@ -135,12 +139,12 @@ do
 		fi
 	    if [ $? -eq 0 ]
 	    then
-	    	echo "Successfully downloaded"
+			echo "Successfully downloaded" 1>&2
 	    	tar -oxzf "$TARFILE"
 	    	cp latest current
 	    fi
 	else
-	    echo "no need to upgrade..."
+	    echo "no need to upgrade..." 1>&2
 	fi
 
 	./minion -cnc="distdns.turbobytes.com:7777" $EXTRAARGS
