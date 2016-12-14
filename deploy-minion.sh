@@ -6,6 +6,10 @@
 #
 # OS and ARCH can be overridden by environment variables, eg:
 #    OS="linux" ARCH="amd64" ./deploy-minion.sh  2>&1 | logger -t minion &
+#
+# Optional environment variable EXTRAARGS contains custom arguments
+# to minion executable.
+#
 
 #Install GPG key if not present
 gpg --list-keys 24F6D50F
@@ -101,7 +105,9 @@ SHAFILE="minion.$OS.$ARCH.tar.gz.sha256sum"
 GPGFILE="minion.$OS.$ARCH.tar.gz.sig"
 BASEURL="https://tb-minion.turbobytes.net/"
 
-echo "minion for this system is: $TARFILE $SHAFILE" 1>&2
+DEFAULT_CNC='-cnc="distdns.turbobytes.com:7777"'
+
+echo "$TARFILE $SHAFILE" 1>&2
 #set -o xtrace
 while :
 do
@@ -147,6 +153,13 @@ do
 	    echo "no need to upgrade..." 1>&2
 	fi
 
-	./minion -cnc="distdns.turbobytes.com:7777" $EXTRAARGS
-	sleep 60 #rest for a minute... Avoid crash loop...
+	# Use default -cnc if not specified
+	grep -Eq '(^| )-cnc=' <<<$EXTRAARGS || EXTRAARGS="$DEFAULT_CNC $EXTRAARGS"
+
+	# Run minion
+	( set -x ; ./minion $EXTRAARGS )
+
+	# Rest for a minute... Avoid crash loop...
+	sleep 60
+
 done
