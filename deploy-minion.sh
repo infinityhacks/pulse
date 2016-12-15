@@ -101,65 +101,59 @@ if [ "$ARCH" = "" ]; then
 fi
 
 TARFILE="minion.$OS.$ARCH.tar.gz"
-SHAFILE="minion.$OS.$ARCH.tar.gz.sha256sum"
-GPGFILE="minion.$OS.$ARCH.tar.gz.sig"
-BASEURL="https://tb-minion.turbobytes.net/"
-
+SHAFILE="$TARFILE.sha256sum"
+GPGFILE="$TARFILE.sig"
+BASEURL="https://tb-minion.turbobytes.net"
 DEFAULT_CNC='-cnc="distdns.turbobytes.com:7777"'
+RETRY_DELAY=60
 
 echo "$TARFILE $SHAFILE" 1>&2
 #set -o xtrace
 while :
 do
-	if [ ! -f current ]; then
-	    echo "none" > current
-	fi
 
-	if [ ! -f $TARFILE ]; then
-	    echo "none" > current
-	fi
+	# Make sure latest version of minion is downloaded
+	for FILE in current minion $TARFILE $SHAFILE $GPGFILE ; do
+		test -s $FILE || echo "none" 1> current
+	done
+	curl -so latest "$BASEURL/latest"
+	if cmp -s current latest ; then
 
-	if [ ! -f minion ]; then
-	    echo "none" > current
-	fi
+	    echo "no need to upgrade..." 1>&2
 
-	curl -so latest "${BASEURL}latest"
+	else
 
-	diff --brief current latest >/dev/null
-	comp_value=$?
-
-	if [ $comp_value -eq 1 ]
-	then
 		#Current did not match latest
 	    echo "need to upgrade..." 1>&2
-	    curl -so "$TARFILE" "$BASEURL$TARFILE"
-	    curl -so "$SHAFILE" "$BASEURL$SHAFILE"
-	    curl -so "$GPGFILE" "$BASEURL$GPGFILE"
+	    curl -so "$TARFILE" "$BASEURL/$TARFILE"
+	    curl -so "$SHAFILE" "$BASEURL/$SHAFILE"
+	    curl -so "$GPGFILE" "$BASEURL/$GPGFILE"
 		if [ $HASGPG -eq 0 ]
 		then
 			#Validate using gpg
+			test -s $GPGFILE && \
 			gpg --verify "$GPGFILE"
 		else
 			#Validate sha256sum as fallback...
+			test -s $SHAFILE && \
 	    	sha256sum -c "$SHAFILE" > /dev/null
 		fi
 	    if [ $? -eq 0 ]
 	    then
 			echo "Successfully downloaded" 1>&2
 	    	tar -oxzf "$TARFILE"
-	    	cp latest current
+			cp -f latest current
 	    fi
-	else
-	    echo "no need to upgrade..." 1>&2
+
 	fi
 
-	# Use default -cnc if not specified
+	# Use default CNC if not specified
 	grep -Eq '(^| )-cnc=' <<<$EXTRAARGS || EXTRAARGS="$DEFAULT_CNC $EXTRAARGS"
 
 	# Run minion
 	( set -x ; ./minion $EXTRAARGS )
 
 	# Rest for a minute... Avoid crash loop...
-	sleep 60
+	sleep $RETRY_DELAY
 
 done
