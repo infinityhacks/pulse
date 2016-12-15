@@ -2,7 +2,7 @@
 #
 # Run minion in this host.
 # Usage:
-#    ./deploy-minion.sh 2>&1 | logget -t minion &
+#    ./deploy-minion.sh 2>&1 | logger -t minion &
 #
 # OS and ARCH can be overridden by environment variables, eg:
 #    OS="linux" ARCH="amd64" ./deploy-minion.sh  2>&1 | logger -t minion &
@@ -163,7 +163,6 @@ do
 	( set -x ; ./minion $EXTRAARGS )
 
 	# Rest for a minute... Avoid crash loop...
-	rm -f current
 	sleep $RETRY_DELAY
 
 done
