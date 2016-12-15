@@ -125,26 +125,35 @@ do
 
 		#Current did not match latest
 	    echo "need to upgrade..." 1>&2
+		rm -f $TARFILE $SHAFILE $GPGFILE
 	    curl -so "$TARFILE" "$BASEURL/$TARFILE"
 	    curl -so "$SHAFILE" "$BASEURL/$SHAFILE"
 	    curl -so "$GPGFILE" "$BASEURL/$GPGFILE"
-		if [ $HASGPG -eq 0 ]
-		then
-			#Validate using gpg
-			test -s $GPGFILE && \
-			gpg --verify "$GPGFILE"
-		else
-			#Validate sha256sum as fallback...
-			test -s $SHAFILE && \
-	    	sha256sum -c "$SHAFILE" > /dev/null
-		fi
-	    if [ $? -eq 0 ]
-	    then
-			echo "Successfully downloaded" 1>&2
-	    	tar -oxzf "$TARFILE"
-			cp -f latest current
-	    fi
 
+	fi
+
+	# Validade downloaded files
+	if [ $HASGPG -eq 0 ] ; then
+		#Validate using gpg
+		test -s $GPGFILE && \
+		gpg --verify "$GPGFILE"
+	else
+		#Validate sha256sum as fallback...
+		test -s $SHAFILE && \
+		sha256sum -c "$SHAFILE" > /dev/null
+	fi
+	if [ $? -eq 0 ] ; then
+		echo "Validation suceeded :-)" 1>&2
+		# Extract minion executable
+		tar -oxzf "$TARFILE"
+		# Mark files updated
+		cp -f latest current
+	else
+		echo "Validation failed :-(" 1>&2
+		# Request for new download
+		rm -f current
+		sleep $RETRY_DELAY
+		continue
 	fi
 
 	# Use default CNC if not specified
@@ -154,6 +163,7 @@ do
 	( set -x ; ./minion $EXTRAARGS )
 
 	# Rest for a minute... Avoid crash loop...
+	rm -f current
 	sleep $RETRY_DELAY
 
 done
