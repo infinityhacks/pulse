@@ -165,15 +165,24 @@ func populatedata(w *Worker, insertfirst bool) {
 	w.FirstOnline = agent.FirstOnline
 }
 
-// lookupAsn is a wrapper around geoipdb.LookupAsn
+// lookupAsn is a wrapper around LookupAsn
 // that returns results as pointers
 func lookupAsn(ip string) (*string, *string) {
-	asn, descr, err := geo.LookupAsn(ip)
+	asn, descr, err := LookupAsn(ip)
 	if err != nil {
 		log.Printf("warning: failed to lookup ASN for %s: %s\n", ip, err)
-		return nil, nil
 	}
 	return &asn, &descr
+}
+
+// LookupAsn is a wrapper around geoipdb.LookupAsn
+// that handles 'Local Network' lookup error.
+func LookupAsn(ip string) (string, string, error) {
+	asn, descr, err := geo.LookupAsn(ip)
+	if err == geoipdb.PrivateIPError {
+		return "RFC1918", "Local Network", nil
+	}
+	return asn, descr, err
 }
 
 func NewWorker(conn net.Conn) *Worker {
@@ -582,7 +591,7 @@ func agentshandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getasnmtr(ip string) string {
-	asn, _, err := geo.LookupAsn(ip)
+	asn, _, err := LookupAsn(ip)
 	if err != nil {
 		log.Printf("warning: asn lookup error for %s: %s\n", ip, err)
 		return ""
@@ -918,7 +927,7 @@ func asnlookupHandler(w http.ResponseWriter, r *http.Request) {
 // asnlookupResult is answered by /asnlookup/ endpoint.
 type AsnlookupResult struct {
 	// IP address used as parameter in by-IP queries
-	Ip     string `json:"ip"`
+	Ip     string               `json:"ip"`
 	Result AsnlookupResultField `json:"result"`
 }
 
@@ -931,7 +940,7 @@ type AsnlookupResultField struct {
 	Cymru AsnlookupQueryResult `json:"cymru"`
 	// Pulse ASN DB
 	Asndb AsnlookupQueryResult `json:"asndb"`
-	// TurboBytes geoipdb.LookupAsnP
+	// TurboBytes geoipdb.LookupAsn
 	Geoipdb AsnlookupQueryResult `json:"geoipdb"`
 }
 
@@ -955,7 +964,7 @@ func asnlookupListCache(w http.ResponseWriter) {
 			continue
 		}
 		ip := ips[0]
-		asn, descr, err := geo.LookupAsn(ip) // ip is cached
+		asn, descr, err := LookupAsn(ip) // ip is cached
 		if err != nil {
 			continue
 		}
@@ -963,9 +972,9 @@ func asnlookupListCache(w http.ResponseWriter) {
 			Ip: ip,
 			Result: AsnlookupResultField{
 				Geoipdb: AsnlookupQueryResult{
-					Asn: asn,
+					Asn:  asn,
 					Name: descr,
-					Err: "",
+					Err:  "",
 				},
 			},
 		})
@@ -1000,7 +1009,6 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	for _, ip := range ips {
 		asn_, _, err := geo.LookupAsn(ip)
 		if err != nil || asn_ != asn {
-			// Resolver IP does not match asn.
 			continue
 		}
 		// Found an IP
@@ -1013,7 +1021,7 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 	var answer AsnlookupResult
 	// Query Cymru
 	cymru := make(chan interface{})
-	go func () {
+	go func() {
 		var err error
 		answer.Result.Cymru.Asn = asn
 		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
@@ -1036,19 +1044,21 @@ func asnlookupGetByAsn(w http.ResponseWriter, asn string) {
 // asnlookupGetByIp queries several sources for ASN descriptions.
 // ASN lookup is done by IP address.
 func asnlookupGetByIp(w http.ResponseWriter, ip string) {
+	var err error
 	var answer AsnlookupResult
 	answer.Ip = ip
+	// Find ASN for this IP
+	asn, _, _ := geo.LookupAsn(ip)
 	// Query GeoipDB
-	var err error
-	answer.Result.Geoipdb.Asn, answer.Result.Geoipdb.Name, err = geo.LookupAsn(answer.Ip)
+	answer.Result.Geoipdb.Asn, answer.Result.Geoipdb.Name, err = LookupAsn(answer.Ip)
 	if err != nil {
 		answer.Result.Geoipdb.Err = err.Error()
 	}
 	// Query Cymru
 	cymru := make(chan interface{})
-	go func () {
+	go func() {
 		var err error
-		answer.Result.Cymru.Asn = answer.Result.Geoipdb.Asn
+		answer.Result.Cymru.Asn = asn
 		answer.Result.Cymru.Name, err = geo.CymruDnsLookup(answer.Result.Cymru.Asn)
 		if err != nil {
 			answer.Result.Cymru.Err = err.Error()
@@ -1068,7 +1078,7 @@ func asnlookupGetByIp(w http.ResponseWriter, ip string) {
 	// Query MaxMind
 	answer.Result.Maxmind.Asn, answer.Result.Maxmind.Name = geo.LibGeoipLookup(answer.Ip)
 	// Query AsnDB
-	answer.Result.Asndb.Asn = answer.Result.Geoipdb.Asn
+	answer.Result.Asndb.Asn = asn
 	answer.Result.Asndb.Name, err = geo.OverridesLookup(answer.Result.Asndb.Asn)
 	if err != nil {
 		answer.Result.Asndb.Err = err.Error()
