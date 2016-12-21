@@ -29,7 +29,27 @@ import (
 	"regexp"
 )
 
-var curlTranslationTable []*regexp.Regexp
+/*
+ * Some people, when confronted with a problem, think "I know, I'll use regular
+ * expressions". Now they have two problems. -- by Jamie Zawinski
+ */
+
+// errorTranslation is a "translation unit".
+type errorTranslation struct {
+	regexp string
+	replacement string
+}
+
+// curlErrorTranslations are matched against curl errors during translation.
+var curlErrorTranslations = []errorTranslation{
+	errorTranslation{
+		"^dial tcp: lookup (\\S*) on \\S*: no such host.*",
+		"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
+	},
+}
+
+// curlErrorRegexps contains compiled regexps from curlErrorTranslations.
+var curlErrorRegexps []*regexp.Regexp
 
 // TranslateError tries to populate field ErrEnglish of a test result
 // with a human friendly description of test's error, if any.
@@ -74,31 +94,20 @@ func translateCurlError(result *CurlResult) {
 	if result.ErrEnglish != "" {
 		return
 	}
-	result.ErrEnglish = "I am a polite, friendly and useless error message. Have a nice day."
+	var idx int
+	var re *regexp.Regexp
+	for idx, re = range curlErrorRegexps {
+		if !re.MatchString(result.Err) {
+			continue
+		}
+		result.ErrEnglish = re.ReplaceAllString(result.Err, curlErrorTranslations[idx].replacement)
+		break
+	}
 }
 
-/*
- * Some people, when confronted with a problem, think "I know, I'll use regular
- * expressions". Now they have two problems. -- by Jamie Zawinski
- */
-
-var curlErrorTranslations = []errorTranslation{
-	errorTranslation{
-		"^dial tcp: lookup (\\S*) on \\S*: no such host.*",
-		"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
-	},
-}
-
-type errorTranslation struct {
-	regexp string
-	replacement string
-}
-
-var curlErrorRegexps []*regexp.Regexp
-
+// Initialize stuff.
 func init() {
-	// Compile error regexps
-	curlErrorRegexps := make([]*regexp.Regexp, len(curlErrorTranslations))
+	curlErrorRegexps = make([]*regexp.Regexp, len(curlErrorTranslations))
 	for idx, translation := range curlErrorTranslations {
 		curlErrorRegexps[idx] = regexp.MustCompile(translation.regexp)
 	}
