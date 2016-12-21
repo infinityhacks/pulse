@@ -32,13 +32,13 @@ import (
 func TestTranslateError(t *testing.T) {
 	testCase := CombinedResult{
 		Type: TypeCurl,
-		Result: CurlResult{
+		Result: &CurlResult{
 			Err: "dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
 		},
 	}
 	expected := "DNS lookup failed. p.catchpoint.com could not be resolved (NXDOMAIN)."
 	TranslateError(&testCase)
-	received := testCase.Result.(CurlResult).ErrEnglish
+	received := testCase.Result.(*CurlResult).ErrEnglish
 	if received != expected {
 		t.Fatalf("translation mismatch: expected \"%s\", got \"%s\"", expected, received)
 	}

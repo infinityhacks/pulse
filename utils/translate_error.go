@@ -29,16 +29,6 @@ import (
 	"regexp"
 )
 
-/*
- * Some people, when confronted with a problem, think "I know, I'll use regular
- * expressions". Now they have two problems. -- by Jamie Zawinski
- */
-
-var curlReplacements = []string{
-	"^dial tcp: lookup (\\S*) on \\S*: no such host*",
-	"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
-}
-
 var curlTranslationTable []*regexp.Regexp
 
 // TranslateError tries to populate field ErrEnglish of a test result
@@ -46,6 +36,70 @@ var curlTranslationTable []*regexp.Regexp
 //
 // Nothing is done if ErrEnglish is already populated.
 func TranslateError(result *CombinedResult) {
-	// FIXME: do nothing if ErrEnglish is already populated.
-	// not yet implemented
+	switch result.Type {
+		case TypeDNS:
+			translateDnsError(result.Result.(*DNSResult))
+		case TypeMTR:
+			translateMtrError(result.Result.(*MtrResult))
+		case TypeCurl:
+			translateCurlError(result.Result.(*CurlResult))
+	}
+}
+
+// translateDnsError tries to populate field ErrEnglish of a DNS test result
+// with a human friendly description of test's error, if any.
+//
+// Nothing is done if ErrEnglish is already populated.
+func translateDnsError(result *DNSResult) {
+	if result.ErrEnglish != "" {
+		return
+	}
+}
+
+// translateMtrError tries to populate field ErrEnglish of a MTR test result
+// with a human friendly description of test's error, if any.
+//
+// Nothing is done if ErrEnglish is already populated.
+func translateMtrError(result *MtrResult) {
+	if result.ErrEnglish != "" {
+		return
+	}
+}
+
+// translateCurlError tries to populate field ErrEnglish of a Curl test result
+// with a human friendly description of test's error, if any.
+//
+// Nothing is done if ErrEnglish is already populated.
+func translateCurlError(result *CurlResult) {
+	if result.ErrEnglish != "" {
+		return
+	}
+	result.ErrEnglish = "I am a polite, friendly and useless error message. Have a nice day."
+}
+
+/*
+ * Some people, when confronted with a problem, think "I know, I'll use regular
+ * expressions". Now they have two problems. -- by Jamie Zawinski
+ */
+
+var curlErrorTranslations = []errorTranslation{
+	errorTranslation{
+		"^dial tcp: lookup (\\S*) on \\S*: no such host.*",
+		"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
+	},
+}
+
+type errorTranslation struct {
+	regexp string
+	replacement string
+}
+
+var curlErrorRegexps []*regexp.Regexp
+
+func init() {
+	// Compile error regexps
+	curlErrorRegexps := make([]*regexp.Regexp, len(curlErrorTranslations))
+	for idx, translation := range curlErrorTranslations {
+		curlErrorRegexps[idx] = regexp.MustCompile(translation.regexp)
+	}
 }
