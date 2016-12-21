@@ -27,30 +27,19 @@ package pulse
 
 import (
 	"testing"
-	"time"
 )
 
 func TestTranslateError(t *testing.T) {
-	type testCase struct {
-		testType int
-		message string
-		expected string
-	}
-	testCases := []testCase{
-		testCase{
-			TypeCurl,
-			"dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
-			"DNS lookup failed. p.catchpoint.com could not be resolved (NXDOMAIN).",
+	testCase := CombinedResult{
+		Type: TypeCurl,
+		Result: CurlResult{
+			Err: "dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
 		},
 	}
-	for _, testCase := range testCases {
-		received := TranslateError(
-			testCase.testType,
-			time.Duration(5)*time.Second,
-			testCase.message,
-		)
-		if received != testCase.expected {
-			t.Fatalf("translation mismatch: expected \"%s\", got \"%s\"", testCase.expected, received)
-		}
+	expected := "DNS lookup failed. p.catchpoint.com could not be resolved (NXDOMAIN)."
+	TranslateError(&testCase)
+	received := testCase.Result.(CurlResult).ErrEnglish
+	if received != expected {
+		t.Fatalf("translation mismatch: expected \"%s\", got \"%s\"", expected, received)
 	}
 }

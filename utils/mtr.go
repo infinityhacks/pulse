@@ -8,8 +8,9 @@ import (
 )
 
 type MtrResult struct {
-	Result *mtrparser.MTROutPut
-	Err    string
+	Result     *mtrparser.MTROutPut
+	Err        string
+	ErrEnglish string //Human friendly version of Err
 }
 
 type MtrRequest struct {
@@ -22,14 +23,14 @@ func MtrImpl(r *MtrRequest) *MtrResult {
 	//Validate r.Target before sending
 	tgt := strings.Trim(r.Target, "\n \r") //Trim whitespace
 	if strings.Contains(tgt, " ") {        //Ensure it doesn't contain space
-		return &MtrResult{nil, "Invalid hostname"}
+		return &MtrResult{nil, "Invalid hostname", ""}
 	}
 	if strings.HasPrefix(tgt, "-") { //Ensure it doesn't start with -
-		return &MtrResult{nil, "Invalid hostname"}
+		return &MtrResult{nil, "Invalid hostname", ""}
 	}
 	out, err := mtrparser.ExecuteMTR(tgt, r.IPv)
 	if err != nil {
-		return &MtrResult{nil, err.Error()}
+		return &MtrResult{nil, err.Error(), ""}
 	}
-	return &MtrResult{out, ""}
+	return &MtrResult{out, "", ""}
 }

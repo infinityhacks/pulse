@@ -22,8 +22,9 @@ type IndividualDNSResult struct {
 }
 
 type DNSResult struct {
-	Results []IndividualDNSResult
-	Err     string //Error with this test
+	Results    []IndividualDNSResult
+	Err        string //Error with this test
+	ErrEnglish string //Human friendly version of Err
 }
 
 type DNSRequest struct {

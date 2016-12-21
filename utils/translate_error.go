@@ -26,22 +26,26 @@
 package pulse
 
 import (
-	"time"
+	"regexp"
 )
 
-// TranslateError tries to provide a human friendly version
-// of a Golang error message.
+/*
+ * Some people, when confronted with a problem, think "I know, I'll use regular
+ * expressions". Now they have two problems. -- by Jamie Zawinski
+ */
+
+var curlReplacements = []string{
+	"^dial tcp: lookup (\\S*) on \\S*: no such host*",
+	"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
+}
+
+var curlTranslationTable []*regexp.Regexp
+
+// TranslateError tries to populate field ErrEnglish of a test result
+// with a human friendly description of test's error, if any.
 //
-// Parameter testType is one of: TypeDNS, TypeMTR, TypeCurl.
-//
-// Parameter testDuration is how long the test took to finish.
-// It may be used as part of translated message.
-//
-// Parameter errMsg is the system error returned by Pulse tests.
-//
-// Returns a human friendly version of the system error,
-// or an empty string if a translation is unknown.
-func TranslateError(testType int, testDuration time.Duration, errMsg string) string {
+// Nothing is done if ErrEnglish is already populated.
+func TranslateError(result *CombinedResult) {
+	// FIXME: do nothing if ErrEnglish is already populated.
 	// not yet implemented
-	return ""
 }
