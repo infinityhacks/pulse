@@ -30,16 +30,35 @@ import (
 )
 
 func TestTranslateError(t *testing.T) {
-	testCase := CombinedResult{
-		Type: TypeCurl,
-		Result: &CurlResult{
-			Err: "dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
+	type testCase struct {
+		testResult CombinedResult
+		expected string
+	}
+	testCases := []testCase{
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
+				},
+			},
+			"DNS lookup failed. p.catchpoint.com could not be resolved (NXDOMAIN).",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout",
+				},
+			},
+			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 5 seconds.",
 		},
 	}
-	expected := "DNS lookup failed. p.catchpoint.com could not be resolved (NXDOMAIN)."
-	TranslateError(&testCase)
-	received := testCase.Result.(*CurlResult).ErrEnglish
-	if received != expected {
-		t.Fatalf("translation mismatch: expected \"%s\", got \"%s\"", expected, received)
+	for _, testCase := range testCases {
+		TranslateError(&testCase.testResult)
+		translated := testCase.testResult.Result.(*CurlResult).ErrEnglish
+		if translated != testCase.expected {
+			t.Fatalf("translation mismatch: expected \"%s\", got \"%s\"", testCase.expected, translated)
+		}
 	}
 }
