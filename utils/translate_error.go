@@ -26,6 +26,7 @@
 package pulse
 
 import (
+	"fmt"
 	"regexp"
 )
 
@@ -41,10 +42,18 @@ type errorTranslation struct {
 }
 
 // curlErrorTranslations are matched against curl errors during translation.
+//
+// In replacement strings, the following named parameters
+// are also replaced by runtime test values:
+// DialTime
 var curlErrorTranslations = []errorTranslation{
 	errorTranslation{
-		"^dial tcp: lookup (\\S*) on \\S*: no such host.*",
+		".*\\bdial tcp: lookup (\\S+) on \\S*: no such host\\b.*",
 		"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
+	},
+	errorTranslation{
+		".*\\bdial tcp (\\S+): i/o timeout\\b.*",
+		"Connection timed out. Agent/client could not connect to $1 within $DialTime seconds.",
 	},
 }
 
@@ -100,7 +109,12 @@ func translateCurlError(result *CurlResult) {
 		if !re.MatchString(result.Err) {
 			continue
 		}
-		result.ErrEnglish = re.ReplaceAllString(result.Err, curlErrorTranslations[idx].replacement)
+		timesRe := regexp.MustCompile("\\$({DialTime}|DialTime\\b)")
+		repl := timesRe.ReplaceAllString(
+			curlErrorTranslations[idx].replacement,
+			fmt.Sprintf("%v", result.DialTime.Seconds()),
+		)
+		result.ErrEnglish = re.ReplaceAllString(result.Err, repl)
 		break
 	}
 }

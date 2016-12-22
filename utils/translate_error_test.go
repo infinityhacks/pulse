@@ -27,6 +27,7 @@ package pulse
 
 import (
 	"testing"
+	"time"
 )
 
 func TestTranslateError(t *testing.T) {
@@ -49,9 +50,10 @@ func TestTranslateError(t *testing.T) {
 				Type: TypeCurl,
 				Result: &CurlResult{
 					Err: "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout",
+					DialTime: time.Microsecond * 5123000,
 				},
 			},
-			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 5 seconds.",
+			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 5.123 seconds.",
 		},
 	}
 	for _, testCase := range testCases {
