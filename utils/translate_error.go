@@ -26,8 +26,9 @@
 package pulse
 
 import (
-	"fmt"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 /*
@@ -37,15 +38,26 @@ import (
 
 // errorTranslation is a "translation unit".
 type errorTranslation struct {
-	regexp string
+	regexp      string
 	replacement string
 }
 
 // curlErrorTranslations are matched against curl errors during translation.
 //
-// In replacement strings, the following named parameters
-// are also replaced by runtime test values:
-// DialTime
+// In replacement strings, the following named parameters are also recognized:
+// DialTimeout (compound timeout for DNS lookup and TCP connection),
+// TlsTimeout (timeout for TLS handshake),
+// KeepTimeout (timeout for Keep-alive),
+// DnsTime (elapsed time during DNS lookup),
+// TcpTime (elapsed time during TCP connection),
+// DialTime (DnsTime + TcpTime),
+// TlsTime (elapsed time during TLS handshake),
+// FrbTime (elapsed time awaiting first response byte after sending HTTP request).
+//
+// In above replacements,
+// timeouts are replaced by integer second values such as '5' or '20',
+// and elapsed times are replaced by float values with unit identification
+// such as '5.2s' or '125ms'.
 var curlErrorTranslations = []errorTranslation{
 	errorTranslation{
 		".*\\bdial tcp: lookup (\\S+) on \\S*: no such host\\b.*",
@@ -53,7 +65,7 @@ var curlErrorTranslations = []errorTranslation{
 	},
 	errorTranslation{
 		".*\\bdial tcp (\\S+): i/o timeout\\b.*",
-		"Connection timed out. Agent/client could not connect to $1 within $DialTime seconds.",
+		"Connection timed out. Agent/client could not connect to $1 within $DialTimeout seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime})",
 	},
 }
 
@@ -66,12 +78,12 @@ var curlErrorRegexps []*regexp.Regexp
 // Nothing is done if ErrEnglish is already populated.
 func TranslateError(result *CombinedResult) {
 	switch result.Type {
-		case TypeDNS:
-			translateDnsError(result.Result.(*DNSResult))
-		case TypeMTR:
-			translateMtrError(result.Result.(*MtrResult))
-		case TypeCurl:
-			translateCurlError(result.Result.(*CurlResult))
+	case TypeDNS:
+		translateDnsError(result.Result.(*DNSResult))
+	case TypeMTR:
+		translateMtrError(result.Result.(*MtrResult))
+	case TypeCurl:
+		translateCurlError(result.Result.(*CurlResult))
 	}
 }
 
@@ -109,20 +121,68 @@ func translateCurlError(result *CurlResult) {
 		if !re.MatchString(result.Err) {
 			continue
 		}
-		timesRe := regexp.MustCompile("\\$({DialTime}|DialTime\\b)")
-		repl := timesRe.ReplaceAllString(
-			curlErrorTranslations[idx].replacement,
-			fmt.Sprintf("%v", result.DialTime.Seconds()),
-		)
-		result.ErrEnglish = re.ReplaceAllString(result.Err, repl)
+		replacement := processCurlReplacement(curlErrorTranslations[idx].replacement, result)
+		result.ErrEnglish = re.ReplaceAllString(result.Err, replacement)
 		break
 	}
 }
 
+// processCurlReplacement replaces curl named parameters
+// (see curlErrorTranslations) in a string.
+
+func processCurlReplacement(repl string, result *CurlResult) string {
+	answer := repl
+	process := func(re *regexp.Regexp, t time.Duration, isTimeout bool) {
+		var val string
+		if isTimeout {
+			val = strconv.FormatFloat(t.Seconds(), 'f', -1, 64)
+		} else {
+			val = t.String()
+		}
+		answer = re.ReplaceAllLiteralString(answer, val)
+	}
+	process(reDialTimeout, dialtimeout, true)
+	process(reTlsTimeout, tlshandshaketimeout, true)
+	process(reKeepTimeout, keepalive, true)
+	process(reDnsTime, result.DNSTime, false)
+	process(reTcpTime, result.ConnectTime, false)
+	process(reDialTime, result.DialTime, false)
+	process(reTlsTime, result.TLSTime, false)
+	process(reFrbTime, result.Ttfb, false)
+	return answer
+}
+
+// regexps for matching curl named parameters (see curlErrorTranslations).
+var (
+	reDialTimeout *regexp.Regexp
+	reTlsTimeout  *regexp.Regexp
+	reKeepTimeout *regexp.Regexp
+	reDnsTime     *regexp.Regexp
+	reTcpTime     *regexp.Regexp
+	reDialTime    *regexp.Regexp
+	reTlsTime     *regexp.Regexp
+	reFrbTime     *regexp.Regexp
+)
+
 // Initialize stuff.
 func init() {
+	// Compile error regexps for Curl tests.
 	curlErrorRegexps = make([]*regexp.Regexp, len(curlErrorTranslations))
 	for idx, translation := range curlErrorTranslations {
 		curlErrorRegexps[idx] = regexp.MustCompile(translation.regexp)
 	}
+	// paramRegexp returns a regexp that matches a named parameter
+	// in forms $... or ${...}
+	paramRegexp := func(paramName string) *regexp.Regexp {
+		return regexp.MustCompile("\\$({" + paramName + "}|" + paramName + "\\b)")
+	}
+	// Compile regexps for Curl named parameters.
+	reDialTimeout = paramRegexp("DialTimeout")
+	reTlsTimeout = paramRegexp("TlsTimeout")
+	reKeepTimeout = paramRegexp("KeepTimeout")
+	reDnsTime = paramRegexp("DnsTime")
+	reTcpTime = paramRegexp("TcpTime")
+	reDialTime = paramRegexp("DialTime")
+	reTlsTime = paramRegexp("TlsTime")
+	reFrbTime = paramRegexp("FrbTime")
 }

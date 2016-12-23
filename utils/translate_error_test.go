@@ -33,8 +33,9 @@ import (
 func TestTranslateError(t *testing.T) {
 	type testCase struct {
 		testResult CombinedResult
-		expected string
+		expected   string
 	}
+	ms128 := time.Millisecond * 128
 	testCases := []testCase{
 		testCase{
 			CombinedResult{
@@ -49,11 +50,13 @@ func TestTranslateError(t *testing.T) {
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					Err: "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout",
-					DialTime: time.Microsecond * 5123000,
+					Err:         "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout",
+					DNSTime:     ms128,
+					ConnectTime: dialtimeout - ms128,
+					DialTime:    dialtimeout,
 				},
 			},
-			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 5.123 seconds.",
+			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 15 seconds. (DNS lookup 128ms, TCP connect 14.872s)",
 		},
 	}
 	for _, testCase := range testCases {
