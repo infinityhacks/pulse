@@ -52,11 +52,16 @@ type errorTranslation struct {
 // TcpTime (elapsed time during TCP connection),
 // DialTime (DnsTime + TcpTime),
 // TlsTime (elapsed time during TLS handshake),
-// FrbTime (elapsed time awaiting first response byte after sending HTTP request).
+// FrbTime (elapsed time awaiting first response byte after sending HTTP request),
+// DnsTimeSec (DnsTime in seconds),
+// TcpTimeSec (TcpTime in seconds),
+// DialTimeSec (DialTime in seconds),
+// TlsTimeSec (TlsTime in seconds),
+// FrbTimeSec (FrbTime in seconds).
 //
-// In above replacements,
-// timeouts are replaced by integer second values such as '5' or '20',
-// and elapsed times are replaced by float values with unit identification
+// In above replacements, Timeout and TimeSec parameters
+// are replaced by integer second values such as '5' or '20',
+// and Time parameters are replaced by float values with unit identification
 // such as '5.2s' or '125ms'.
 var curlErrorTranslations = []errorTranslation{
 	errorTranslation{
@@ -65,7 +70,11 @@ var curlErrorTranslations = []errorTranslation{
 	},
 	errorTranslation{
 		".*\\bdial tcp (\\S+): i/o timeout\\b.*",
-		"Connection timed out. Agent/client could not connect to $1 within $DialTimeout seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime})",
+		"Connection timed out. Agent/client could not connect to $1 within $DialTimeSec seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime})",
+	},
+	errorTranslation{
+		".*\\bnet/http: timeout awaiting response headers\\b.*",
+		"Request timed out. TCP connection was established but server did not respond to the request within ${FrbTimeSec} seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime}, TLS handshake ${TlsTime})",
 	},
 }
 
@@ -132,23 +141,37 @@ func translateCurlError(result *CurlResult) {
 
 func processCurlReplacement(repl string, result *CurlResult) string {
 	answer := repl
-	process := func(re *regexp.Regexp, t time.Duration, isTimeout bool) {
-		var val string
-		if isTimeout {
-			val = strconv.FormatFloat(t.Seconds(), 'f', -1, 64)
-		} else {
-			val = t.String()
-		}
-		answer = re.ReplaceAllLiteralString(answer, val)
+	processTimeout := func(re *regexp.Regexp, t time.Duration) {
+		answer = re.ReplaceAllLiteralString(
+			answer,
+			strconv.FormatFloat(t.Seconds(), 'f', -1, 64),
+		)
 	}
-	process(reDialTimeout, dialtimeout, true)
-	process(reTlsTimeout, tlshandshaketimeout, true)
-	process(reKeepTimeout, keepalive, true)
-	process(reDnsTime, result.DNSTime, false)
-	process(reTcpTime, result.ConnectTime, false)
-	process(reDialTime, result.DialTime, false)
-	process(reTlsTime, result.TLSTime, false)
-	process(reFrbTime, result.Ttfb, false)
+	processTime := func(re *regexp.Regexp, t time.Duration) {
+		answer = re.ReplaceAllLiteralString(
+			answer,
+			t.String(),
+		)
+	}
+	processTimeSec := func(re *regexp.Regexp, t time.Duration) {
+		answer = re.ReplaceAllLiteralString(
+			answer,
+			strconv.FormatFloat(t.Seconds(), 'f', 0, 64),
+		)
+	}
+	processTimeout(reDialTimeout, dialtimeout)
+	processTimeout(reTlsTimeout, tlshandshaketimeout)
+	processTimeout(reKeepTimeout, keepalive)
+	processTime(reDnsTime, result.DNSTime)
+	processTime(reTcpTime, result.ConnectTime)
+	processTime(reDialTime, result.DialTime)
+	processTime(reTlsTime, result.TLSTime)
+	processTime(reFrbTime, result.Ttfb)
+	processTimeSec(reDnsTimeSec, result.DNSTime)
+	processTimeSec(reTcpTimeSec, result.ConnectTime)
+	processTimeSec(reDialTimeSec, result.DialTime)
+	processTimeSec(reTlsTimeSec, result.TLSTime)
+	processTimeSec(reFrbTimeSec, result.Ttfb)
 	return answer
 }
 
@@ -162,6 +185,11 @@ var (
 	reDialTime    *regexp.Regexp
 	reTlsTime     *regexp.Regexp
 	reFrbTime     *regexp.Regexp
+	reDnsTimeSec     *regexp.Regexp
+	reTcpTimeSec     *regexp.Regexp
+	reDialTimeSec    *regexp.Regexp
+	reTlsTimeSec     *regexp.Regexp
+	reFrbTimeSec     *regexp.Regexp
 )
 
 // Initialize stuff.
@@ -185,4 +213,9 @@ func init() {
 	reDialTime = paramRegexp("DialTime")
 	reTlsTime = paramRegexp("TlsTime")
 	reFrbTime = paramRegexp("FrbTime")
+	reDnsTimeSec = paramRegexp("DnsTimeSec")
+	reTcpTimeSec = paramRegexp("TcpTimeSec")
+	reDialTimeSec = paramRegexp("DialTimeSec")
+	reTlsTimeSec = paramRegexp("TlsTimeSec")
+	reFrbTimeSec = paramRegexp("FrbTimeSec")
 }

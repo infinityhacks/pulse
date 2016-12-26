@@ -36,6 +36,9 @@ func TestTranslateError(t *testing.T) {
 		expected   string
 	}
 	ms128 := time.Millisecond * 128
+	ms429 := time.Millisecond * 429
+	ms2041 := time.Millisecond * 2041
+	ms10050 := time.Millisecond * 10050
 	testCases := []testCase{
 		testCase{
 			CombinedResult{
@@ -57,6 +60,20 @@ func TestTranslateError(t *testing.T) {
 				},
 			},
 			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 15 seconds. (DNS lookup 128ms, TCP connect 14.872s)",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "net/http: timeout awaiting response headers",
+					DNSTime: ms128,
+					ConnectTime: ms2041,
+					DialTime:    ms128 + ms2041,
+					TLSTime: ms429,
+					Ttfb: ms10050,
+				},
+			},
+			"Request timed out. TCP connection was established but server did not respond to the request within 10 seconds. (DNS lookup 128ms, TCP connect 2.041s, TLS handshake 429ms)",
 		},
 	}
 	for _, testCase := range testCases {
