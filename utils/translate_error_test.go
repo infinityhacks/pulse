@@ -27,7 +27,6 @@ package pulse
 
 import (
 	"testing"
-	"time"
 )
 
 func TestTranslateError(t *testing.T) {
@@ -35,17 +34,22 @@ func TestTranslateError(t *testing.T) {
 		testResult CombinedResult
 		expected   string
 	}
-	ms50 := time.Millisecond * 50
-	ms128 := time.Millisecond * 128
-	ms429 := time.Millisecond * 429
-	ms2041 := time.Millisecond * 2041
-	ms10050 := time.Millisecond * 10050
 	testCases := []testCase{
 		testCase{
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					Err: "dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
+					//ConnectTime: 9.223372036854776e+18,
+					//ConnectTimeStr: "2562047h47m16.854775807s",
+					//DNSTime:1.32406652e+08,
+					//DNSTimeStr:"132.406652ms",
+					//DialTime:-9.22337203672237e+18,
+					//DialTimeStr:"-2562047h47m16.722369157s",
+					//TLSTime:0,
+					//TLSTimeStr:"0s",
+					//Ttfb:0,
+					//TtfbStr:"0s",
+					Err: "Get http://p.catchpoint.com/: dial tcp: lookup p.catchpoint.com on 192.168.1.1:53: no such host",
 				},
 			},
 			"DNS lookup failed. p.catchpoint.com could not be resolved (NXDOMAIN).",
@@ -54,38 +58,58 @@ func TestTranslateError(t *testing.T) {
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					Err:         "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout",
-					DNSTime:     ms128,
-					ConnectTime: dialtimeout - ms128,
-					DialTime:    dialtimeout,
+					ConnectTime:    1.5001603612e+10,
+					ConnectTimeStr: "15.001603612s",
+					DNSTime:        0,
+					DNSTimeStr:     "0s",
+					DialTime:       1.5001603612e+10,
+					DialTimeStr:    "15.001603612s",
+					TLSTime:        0,
+					TLSTimeStr:     "0s",
+					Ttfb:           0,
+					TtfbStr:        "0s",
+					Err:            "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout",
 				},
 			},
-			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 15 seconds. (DNS lookup 128ms, TCP connect 14.872s)",
+			"Connection timed out. Agent/client could not connect to 8.8.8.8:80 within 15 seconds. (DNS lookup 0s, TCP connect 15.001603612s)",
 		},
 		testCase{
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					Err:         "net/http: timeout awaiting response headers",
-					DNSTime:     ms128,
-					ConnectTime: ms2041,
-					DialTime:    ms128 + ms2041,
-					TLSTime:     ms429,
-					Ttfb:        ms10050,
+					ConnectTime:    9.3473233e+07,
+					ConnectTimeStr: "93.473233ms",
+					DNSTime:        8.6351441e+07,
+					DNSTimeStr:     "86.351441ms",
+					DialTime:       1.79824674e+08,
+					DialTimeStr:    "179.824674ms",
+					TLSTime:        110043,
+					TLSTimeStr:     "110.043Âµs",
+					Ttfb:           0,
+					TtfbStr:        "0s",
+					Err:            "Get http://some.site.com/1234/: net/http: timeout awaiting response headers",
 				},
 			},
-			"Request timed out. TCP connection was established but server did not respond to the request within 10 seconds. (DNS lookup 128ms, TCP connect 2.041s, TLS handshake 429ms)",
+			"Request timed out. TCP connection was established but server did not respond to the request within 25 seconds. (DNS lookup 86.351441ms, TCP connect 93.473233ms, TLS handshake 110.043µs)",
 		},
 		testCase{
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					Err:      "Get http://lw.cdnplanet.com/static/rum/15kb-image.jpg?t=foo: dial tcp: lookup lw.cdnplanet.com on 8.8.4.4:53: dial udp 8.8.4.4:53: i/o timeout",
-					DNSTime:  dialtimeout + ms50,
-					DialTime: dialtimeout + ms50,
+					//ConnectTime:9.223372036854776e+18,
+					//ConnectTimeStr:"2562047h47m16.854775807s",
+					DNSTime:    5.01085708e+09,
+					DNSTimeStr: "5.01085708s",
+					//DialTime:-9.223372031843919e+18,
+					//DialTimeStr:"-2562047h47m11.843918729s",
+					TLSTime:    0,
+					TLSTimeStr: "0s",
+					Ttfb:       0,
+					TtfbStr:    "0s",
+					Err:        "Get http://lw.cdnplanet.com/static/rum/15kb-image.jpg?t=foo: dial tcp: lookup lw.cdnplanet.com on 8.8.4.4:53: dial udp 8.8.4.4:53: i/o timeout",
 				},
 			},
-			"DNS lookup timed out. No response from 8.8.4.4:53 within 15 seconds.",
+			"DNS lookup timed out. No response from 8.8.4.4:53 within 5 seconds.",
 		},
 		testCase{
 			CombinedResult{

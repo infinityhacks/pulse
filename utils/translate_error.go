@@ -47,6 +47,7 @@ type errorTranslation struct {
 // In replacement strings, the following named parameters are also recognized:
 // DialTimeout (compound timeout for DNS lookup and TCP connection),
 // TlsTimeout (timeout for TLS handshake),
+// ResponseTimeout (timeout for receiving response headers),
 // KeepTimeout (timeout for Keep-alive),
 // DnsTime (elapsed time during DNS lookup),
 // TcpTime (elapsed time during TCP connection),
@@ -82,7 +83,7 @@ var curlErrorTranslations = []errorTranslation{
 	},
 	errorTranslation{
 		".*\\bnet/http: timeout awaiting response headers\\b.*",
-		"Request timed out. TCP connection was established but server did not respond to the request within ${FrbTimeSec} seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime}, TLS handshake ${TlsTime})",
+		"Request timed out. TCP connection was established but server did not respond to the request within ${ResponseTimeout} seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime}, TLS handshake ${TlsTime})",
 	},
 	errorTranslation{
 		".*\\bdial tcp \\[(\\S+)]:(\\d+): connection refused\\b.*",
@@ -177,6 +178,7 @@ func processCurlReplacement(repl string, result *CurlResult) string {
 	}
 	processTimeout(reDialTimeout, dialtimeout)
 	processTimeout(reTlsTimeout, tlshandshaketimeout)
+	processTimeout(reResponseTimeout, responsetimeout)
 	processTimeout(reKeepTimeout, keepalive)
 	processTime(reDnsTime, result.DNSTime)
 	processTime(reTcpTime, result.ConnectTime)
@@ -193,19 +195,20 @@ func processCurlReplacement(repl string, result *CurlResult) string {
 
 // regexps for matching curl named parameters (see curlErrorTranslations).
 var (
-	reDialTimeout *regexp.Regexp
-	reTlsTimeout  *regexp.Regexp
-	reKeepTimeout *regexp.Regexp
-	reDnsTime     *regexp.Regexp
-	reTcpTime     *regexp.Regexp
-	reDialTime    *regexp.Regexp
-	reTlsTime     *regexp.Regexp
-	reFrbTime     *regexp.Regexp
-	reDnsTimeSec  *regexp.Regexp
-	reTcpTimeSec  *regexp.Regexp
-	reDialTimeSec *regexp.Regexp
-	reTlsTimeSec  *regexp.Regexp
-	reFrbTimeSec  *regexp.Regexp
+	reDialTimeout     *regexp.Regexp
+	reResponseTimeout *regexp.Regexp
+	reTlsTimeout      *regexp.Regexp
+	reKeepTimeout     *regexp.Regexp
+	reDnsTime         *regexp.Regexp
+	reTcpTime         *regexp.Regexp
+	reDialTime        *regexp.Regexp
+	reTlsTime         *regexp.Regexp
+	reFrbTime         *regexp.Regexp
+	reDnsTimeSec      *regexp.Regexp
+	reTcpTimeSec      *regexp.Regexp
+	reDialTimeSec     *regexp.Regexp
+	reTlsTimeSec      *regexp.Regexp
+	reFrbTimeSec      *regexp.Regexp
 )
 
 // Initialize stuff.
@@ -223,6 +226,7 @@ func init() {
 	// Compile regexps for Curl named parameters.
 	reDialTimeout = paramRegexp("DialTimeout")
 	reTlsTimeout = paramRegexp("TlsTimeout")
+	reResponseTimeout = paramRegexp("ResponseTimeout")
 	reKeepTimeout = paramRegexp("KeepTimeout")
 	reDnsTime = paramRegexp("DnsTime")
 	reTcpTime = paramRegexp("TcpTime")
