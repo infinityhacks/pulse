@@ -65,6 +65,14 @@ type errorTranslation struct {
 // such as '5.2s' or '125ms'.
 var curlErrorTranslations = []errorTranslation{
 	errorTranslation{
+		".*\\bdial udp (\\S+): i/o timeout\\b.*",
+		"DNS lookup timed out. No response from $1 within $DnsTimeSec seconds.",
+	},
+	errorTranslation{
+		".*\\bdial tcp: lookup \\S+ on (\\S+): server misbehaving\\b.*",
+		"DNS lookup failed. Agent/client can’t reach ${1}.",
+	},
+	errorTranslation{
 		".*\\bdial tcp: lookup (\\S+) on \\S*: no such host\\b.*",
 		"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
 	},
@@ -75,6 +83,14 @@ var curlErrorTranslations = []errorTranslation{
 	errorTranslation{
 		".*\\bnet/http: timeout awaiting response headers\\b.*",
 		"Request timed out. TCP connection was established but server did not respond to the request within ${FrbTimeSec} seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime}, TLS handshake ${TlsTime})",
+	},
+	errorTranslation{
+		".*\\bdial tcp \\[(\\S+)]:(\\d+): connection refused\\b.*",
+		"Connection refused. $1 did not accept the connection on port ${2}.",
+	},
+	errorTranslation{
+		".*\\bdial tcp (\\S+):(\\d+): connection refused\\b.*",
+		"Connection refused. $1 did not accept the connection on port ${2}.",
 	},
 }
 
@@ -185,11 +201,11 @@ var (
 	reDialTime    *regexp.Regexp
 	reTlsTime     *regexp.Regexp
 	reFrbTime     *regexp.Regexp
-	reDnsTimeSec     *regexp.Regexp
-	reTcpTimeSec     *regexp.Regexp
-	reDialTimeSec    *regexp.Regexp
-	reTlsTimeSec     *regexp.Regexp
-	reFrbTimeSec     *regexp.Regexp
+	reDnsTimeSec  *regexp.Regexp
+	reTcpTimeSec  *regexp.Regexp
+	reDialTimeSec *regexp.Regexp
+	reTlsTimeSec  *regexp.Regexp
+	reFrbTimeSec  *regexp.Regexp
 )
 
 // Initialize stuff.

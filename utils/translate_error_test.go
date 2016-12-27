@@ -35,6 +35,7 @@ func TestTranslateError(t *testing.T) {
 		testResult CombinedResult
 		expected   string
 	}
+	ms50 := time.Millisecond * 50
 	ms128 := time.Millisecond * 128
 	ms429 := time.Millisecond * 429
 	ms2041 := time.Millisecond * 2041
@@ -65,15 +66,53 @@ func TestTranslateError(t *testing.T) {
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					Err: "net/http: timeout awaiting response headers",
-					DNSTime: ms128,
+					Err:         "net/http: timeout awaiting response headers",
+					DNSTime:     ms128,
 					ConnectTime: ms2041,
 					DialTime:    ms128 + ms2041,
-					TLSTime: ms429,
-					Ttfb: ms10050,
+					TLSTime:     ms429,
+					Ttfb:        ms10050,
 				},
 			},
 			"Request timed out. TCP connection was established but server did not respond to the request within 10 seconds. (DNS lookup 128ms, TCP connect 2.041s, TLS handshake 429ms)",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err:      "Get http://lw.cdnplanet.com/static/rum/15kb-image.jpg?t=foo: dial tcp: lookup lw.cdnplanet.com on 8.8.4.4:53: dial udp 8.8.4.4:53: i/o timeout",
+					DNSTime:  dialtimeout + ms50,
+					DialTime: dialtimeout + ms50,
+				},
+			},
+			"DNS lookup timed out. No response from 8.8.4.4:53 within 15 seconds.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "dial tcp 203.26.25.4:80: connection refused",
+				},
+			},
+			"Connection refused. 203.26.25.4 did not accept the connection on port 80.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "dial tcp [2400:cb00:2048:1::c629:d7a2]:443: connection refused",
+				},
+			},
+			"Connection refused. 2400:cb00:2048:1::c629:d7a2 did not accept the connection on port 443.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "dial tcp: lookup cdn.albel.li on 192.168.1.250:53: server misbehaving",
+				},
+			},
+			"DNS lookup failed. Agent/client can’t reach 192.168.1.250:53.",
 		},
 	}
 	for _, testCase := range testCases {
