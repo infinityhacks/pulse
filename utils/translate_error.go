@@ -120,19 +120,42 @@ func translateCurlError(result *CurlResult) {
 	}
 
 	// Err: "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout"
-	pattern = ".*\\bdial tcp (\\S+): i/o timeout\\b.*"
+	// Err: "Get http://some.site.com/: dial tcp some.site.com:80: i/o timeout",
+	// Err: "Get http://2400:cb00:2048:1::c629:d7a2/: dial tcp [2400:cb00:2048:1::c629:d7a2]:80: i/o timeout"
+	ipv6 := true
+	pattern = ".*\\bdial tcp \\[([^]].*)]:([[:digit:]]*): i/o timeout\\b.*"
 	re, err = regexp.Compile(pattern)
+	if err == nil && !re.MatchString(result.Err) {
+		ipv6 = false
+		pattern = ".*\\bdial tcp ([^:]*):([[:digit:]]*): i/o timeout\\b.*"
+		re, err = regexp.Compile(pattern)
+	}
 	if err == nil && re.MatchString(result.Err) {
-		result.ErrEnglish = re.ReplaceAllString(
-			result.Err,
-			"Connection timed out. Agent/client could not connect to $1 within "+
-				inIntegerSeconds(result.DialTime)+
-				" seconds. (DNS lookup "+
-				result.DNSTime.String()+
-				", TCP connect "+
-				result.ConnectTime.String()+
-				")",
-		)
+		var replacement string
+		if result.DNSTime == 0 {
+			if ipv6 {
+				replacement = "Connection timed out. Could not connect to [${1}]:${2} within " +
+					inIntegerSeconds(result.DialTime) +
+					" seconds."
+			} else {
+				replacement = "Connection timed out. Could not connect to ${1}:${2} within " +
+					inIntegerSeconds(result.DialTime) +
+					" seconds."
+			}
+		} else if result.ConnectTime == 0 {
+			replacement = "DNS lookup timed out. Could not resolve $1 within " +
+				inIntegerSeconds(result.DialTime) +
+				" seconds."
+		} else {
+			replacement = "Lookup with connection timed out. Could not perform DNS lookup and TCP connection to $1 within " +
+				inIntegerSeconds(result.DialTime) +
+				" seconds. (DNS lookup " +
+				inIntegerMilli(result.DNSTime) +
+				"ms, TCP connect " +
+				inIntegerMilli(result.ConnectTime) +
+				"ms)"
+		}
+		result.ErrEnglish = re.ReplaceAllString(result.Err, replacement)
 		return
 	}
 
@@ -145,12 +168,12 @@ func translateCurlError(result *CurlResult) {
 			"Request timed out. TCP connection was established but server did not respond to the request within "+
 				inIntegerSeconds(responsetimeout)+
 				" seconds. (DNS lookup "+
-				result.DNSTime.String()+
-				", TCP connect "+
-				result.ConnectTime.String()+
-				", TLS handshake "+
-				result.TLSTime.String()+
-				")",
+				inIntegerMilli(result.DNSTime)+
+				"ms, TCP connect "+
+				inIntegerMilli(result.ConnectTime)+
+				"ms, TLS handshake "+
+				inIntegerMilli(result.TLSTime)+
+				"ms)",
 		)
 		return
 	}
@@ -182,4 +205,9 @@ func translateCurlError(result *CurlResult) {
 // inIntegerSeconds formats a Duration to an integer number of seconds.
 func inIntegerSeconds(d time.Duration) string {
 	return strconv.FormatFloat(d.Seconds(), 'f', 0, 64)
+}
+
+// inIntegerMilli formats a Duration to an integer number of milliseconds.
+func inIntegerMilli(d time.Duration) string {
+	return strconv.FormatFloat(d.Seconds()*1000, 'f', 0, 64)
 }
