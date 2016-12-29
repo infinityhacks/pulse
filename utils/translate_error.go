@@ -31,73 +31,6 @@ import (
 	"time"
 )
 
-/*
- * Some people, when confronted with a problem, think "I know, I'll use regular
- * expressions". Now they have two problems. -- by Jamie Zawinski
- */
-
-// errorTranslation is a "translation unit".
-type errorTranslation struct {
-	regexp      string
-	replacement string
-}
-
-// curlErrorTranslations are matched against curl errors during translation.
-//
-// In replacement strings, the following named parameters are also recognized:
-// DialTimeout (compound timeout for DNS lookup and TCP connection),
-// TlsTimeout (timeout for TLS handshake),
-// ResponseTimeout (timeout for receiving response headers),
-// KeepTimeout (timeout for Keep-alive),
-// DnsTime (elapsed time during DNS lookup),
-// TcpTime (elapsed time during TCP connection),
-// DialTime (DnsTime + TcpTime),
-// TlsTime (elapsed time during TLS handshake),
-// FrbTime (elapsed time awaiting first response byte after sending HTTP request),
-// DnsTimeSec (DnsTime in seconds),
-// TcpTimeSec (TcpTime in seconds),
-// DialTimeSec (DialTime in seconds),
-// TlsTimeSec (TlsTime in seconds),
-// FrbTimeSec (FrbTime in seconds).
-//
-// In above replacements, Timeout and TimeSec parameters
-// are replaced by integer second values such as '5' or '20',
-// and Time parameters are replaced by float values with unit identification
-// such as '5.2s' or '125ms'.
-var curlErrorTranslations = []errorTranslation{
-	errorTranslation{
-		".*\\bdial udp (\\S+): i/o timeout\\b.*",
-		"DNS lookup timed out. No response from $1 within $DnsTimeSec seconds.",
-	},
-	errorTranslation{
-		".*\\bdial tcp: lookup \\S+ on (\\S+): server misbehaving\\b.*",
-		"DNS lookup failed. Agent/client can’t reach ${1}.",
-	},
-	errorTranslation{
-		".*\\bdial tcp: lookup (\\S+) on \\S*: no such host\\b.*",
-		"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
-	},
-	errorTranslation{
-		".*\\bdial tcp (\\S+): i/o timeout\\b.*",
-		"Connection timed out. Agent/client could not connect to $1 within $DialTimeSec seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime})",
-	},
-	errorTranslation{
-		".*\\bnet/http: timeout awaiting response headers\\b.*",
-		"Request timed out. TCP connection was established but server did not respond to the request within ${ResponseTimeout} seconds. (DNS lookup ${DnsTime}, TCP connect ${TcpTime}, TLS handshake ${TlsTime})",
-	},
-	errorTranslation{
-		".*\\bdial tcp \\[(\\S+)]:(\\d+): connection refused\\b.*",
-		"Connection refused. $1 did not accept the connection on port ${2}.",
-	},
-	errorTranslation{
-		".*\\bdial tcp (\\S+):(\\d+): connection refused\\b.*",
-		"Connection refused. $1 did not accept the connection on port ${2}.",
-	},
-}
-
-// curlErrorRegexps contains compiled regexps from curlErrorTranslations.
-var curlErrorRegexps []*regexp.Regexp
-
 // TranslateError tries to populate field ErrEnglish of a test result
 // with a human friendly description of test's error, if any.
 //
@@ -141,101 +74,112 @@ func translateCurlError(result *CurlResult) {
 	if result.ErrEnglish != "" {
 		return
 	}
-	var idx int
+
+	/*
+	 * Some people, when confronted with a problem, think "I know, I'll use regular
+	 * expressions". Now they have two problems. -- by Jamie Zawinski
+	 */
+
+	var pattern string
 	var re *regexp.Regexp
-	for idx, re = range curlErrorRegexps {
-		if !re.MatchString(result.Err) {
-			continue
-		}
-		replacement := processCurlReplacement(curlErrorTranslations[idx].replacement, result)
-		result.ErrEnglish = re.ReplaceAllString(result.Err, replacement)
-		break
+	var err error
+
+	// Err: "Get http://lw.cdnplanet.com/static/rum/15kb-image.jpg?t=foo: dial tcp: lookup lw.cdnplanet.com on 8.8.4.4:53: dial udp 8.8.4.4:53: i/o timeout"
+	pattern = ".*\\bdial udp (\\S+): i/o timeout\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup timed out. No response from $1 within "+
+				inIntegerSeconds(result.DNSTime)+
+				" seconds.",
+		)
+		return
 	}
+
+	// Err: "dial tcp: lookup some.site.com on 192.168.1.250:53: server misbehaving"
+	pattern = ".*\\bdial tcp: lookup \\S+ on (\\S+): server misbehaving\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup failed. Agent/client can’t reach ${1}.",
+		)
+		return
+	}
+
+	// Err: "Get http://some.site.com/: dial tcp: lookup some.site.com on 192.168.1.1:53: no such host",
+	pattern = ".*\\bdial tcp: lookup (\\S+) on \\S*: no such host\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
+		)
+		return
+	}
+
+	// Err: "Get http://8.8.8.8/: dial tcp 8.8.8.8:80: i/o timeout"
+	pattern = ".*\\bdial tcp (\\S+): i/o timeout\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Connection timed out. Agent/client could not connect to $1 within "+
+				inIntegerSeconds(result.DialTime)+
+				" seconds. (DNS lookup "+
+				result.DNSTime.String()+
+				", TCP connect "+
+				result.ConnectTime.String()+
+				")",
+		)
+		return
+	}
+
+	// Err: "Get http://some.site.com/1234/: net/http: timeout awaiting response headers",
+	pattern = ".*\\bnet/http: timeout awaiting response headers\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Request timed out. TCP connection was established but server did not respond to the request within "+
+				inIntegerSeconds(responsetimeout)+
+				" seconds. (DNS lookup "+
+				result.DNSTime.String()+
+				", TCP connect "+
+				result.ConnectTime.String()+
+				", TLS handshake "+
+				result.TLSTime.String()+
+				")",
+		)
+		return
+	}
+
+	// Err: dial tcp [2400:cb00:2048:1::c629:d7a2]:443: connection refused",
+	pattern = ".*\\bdial tcp \\[(\\S+)]:(\\d+): connection refused\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Connection refused. $1 did not accept the connection on port ${2}.",
+		)
+		return
+	}
+
+	// Err: "dial tcp 203.26.25.4:80: connection refused",
+	pattern = ".*\\bdial tcp (\\S+):(\\d+): connection refused\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Connection refused. $1 did not accept the connection on port ${2}.",
+		)
+		return
+	}
+
 }
 
-// processCurlReplacement replaces curl named parameters
-// (see curlErrorTranslations) in a string.
-
-func processCurlReplacement(repl string, result *CurlResult) string {
-	answer := repl
-	processTimeout := func(re *regexp.Regexp, t time.Duration) {
-		answer = re.ReplaceAllLiteralString(
-			answer,
-			strconv.FormatFloat(t.Seconds(), 'f', -1, 64),
-		)
-	}
-	processTime := func(re *regexp.Regexp, t time.Duration) {
-		answer = re.ReplaceAllLiteralString(
-			answer,
-			t.String(),
-		)
-	}
-	processTimeSec := func(re *regexp.Regexp, t time.Duration) {
-		answer = re.ReplaceAllLiteralString(
-			answer,
-			strconv.FormatFloat(t.Seconds(), 'f', 0, 64),
-		)
-	}
-	processTimeout(reDialTimeout, dialtimeout)
-	processTimeout(reTlsTimeout, tlshandshaketimeout)
-	processTimeout(reResponseTimeout, responsetimeout)
-	processTimeout(reKeepTimeout, keepalive)
-	processTime(reDnsTime, result.DNSTime)
-	processTime(reTcpTime, result.ConnectTime)
-	processTime(reDialTime, result.DialTime)
-	processTime(reTlsTime, result.TLSTime)
-	processTime(reFrbTime, result.Ttfb)
-	processTimeSec(reDnsTimeSec, result.DNSTime)
-	processTimeSec(reTcpTimeSec, result.ConnectTime)
-	processTimeSec(reDialTimeSec, result.DialTime)
-	processTimeSec(reTlsTimeSec, result.TLSTime)
-	processTimeSec(reFrbTimeSec, result.Ttfb)
-	return answer
-}
-
-// regexps for matching curl named parameters (see curlErrorTranslations).
-var (
-	reDialTimeout     *regexp.Regexp
-	reResponseTimeout *regexp.Regexp
-	reTlsTimeout      *regexp.Regexp
-	reKeepTimeout     *regexp.Regexp
-	reDnsTime         *regexp.Regexp
-	reTcpTime         *regexp.Regexp
-	reDialTime        *regexp.Regexp
-	reTlsTime         *regexp.Regexp
-	reFrbTime         *regexp.Regexp
-	reDnsTimeSec      *regexp.Regexp
-	reTcpTimeSec      *regexp.Regexp
-	reDialTimeSec     *regexp.Regexp
-	reTlsTimeSec      *regexp.Regexp
-	reFrbTimeSec      *regexp.Regexp
-)
-
-// Initialize stuff.
-func init() {
-	// Compile error regexps for Curl tests.
-	curlErrorRegexps = make([]*regexp.Regexp, len(curlErrorTranslations))
-	for idx, translation := range curlErrorTranslations {
-		curlErrorRegexps[idx] = regexp.MustCompile(translation.regexp)
-	}
-	// paramRegexp returns a regexp that matches a named parameter
-	// in forms $... or ${...}
-	paramRegexp := func(paramName string) *regexp.Regexp {
-		return regexp.MustCompile("\\$({" + paramName + "}|" + paramName + "\\b)")
-	}
-	// Compile regexps for Curl named parameters.
-	reDialTimeout = paramRegexp("DialTimeout")
-	reTlsTimeout = paramRegexp("TlsTimeout")
-	reResponseTimeout = paramRegexp("ResponseTimeout")
-	reKeepTimeout = paramRegexp("KeepTimeout")
-	reDnsTime = paramRegexp("DnsTime")
-	reTcpTime = paramRegexp("TcpTime")
-	reDialTime = paramRegexp("DialTime")
-	reTlsTime = paramRegexp("TlsTime")
-	reFrbTime = paramRegexp("FrbTime")
-	reDnsTimeSec = paramRegexp("DnsTimeSec")
-	reTcpTimeSec = paramRegexp("TcpTimeSec")
-	reDialTimeSec = paramRegexp("DialTimeSec")
-	reTlsTimeSec = paramRegexp("TlsTimeSec")
-	reFrbTimeSec = paramRegexp("FrbTimeSec")
+// inIntegerSeconds formats a Duration to an integer number of seconds.
+func inIntegerSeconds(d time.Duration) string {
+	return strconv.FormatFloat(d.Seconds(), 'f', 0, 64)
 }
