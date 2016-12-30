@@ -10,21 +10,21 @@ import (
 )
 
 type IndividualDNSResult struct {
-	Server   string        //IP/hostname the query was sent to
-	Err      string        //Any error that occurred with this particular query.
-	RttStr   string        //Round trip time in humanized form
-	Rtt      time.Duration //Round trip time
-	Raw      []byte        //Raw packet
-	Formated string        //Dig style formating
-	Msg      *dns.Msg      //Parsed DNS message
-	ASN      *string       //ASN of Server
-	ASName   *string       //ASN description
+	Server     string        //IP/hostname the query was sent to
+	Err        string        //Any error that occurred with this particular query.
+	ErrEnglish string        //Human friendly version of Err
+	RttStr     string        //Round trip time in humanized form
+	Rtt        time.Duration //Round trip time
+	Raw        []byte        //Raw packet
+	Formated   string        //Dig style formating
+	Msg        *dns.Msg      //Parsed DNS message
+	ASN        *string       //ASN of Server
+	ASName     *string       //ASN description
 }
 
 type DNSResult struct {
-	Results    []IndividualDNSResult
-	Err        string //Error with this test
-	ErrEnglish string //Human friendly version of Err
+	Results []IndividualDNSResult
+	Err     string //Error with this test
 }
 
 type DNSRequest struct {

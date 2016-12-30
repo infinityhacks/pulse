@@ -174,12 +174,77 @@ func TestTranslateError(t *testing.T) {
 			},
 			"DNS lookup failed. Agent/client can’t reach 192.168.1.250:53.",
 		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "dial udp: lookup some.site.com on 192.168.2.254:53: no such host",
+						},
+					},
+				},
+			},
+			"DNS lookup failed. some.site.com could not be resolved (NXDOMAIN).",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Rtt: 2.000831501e+09,
+							Err: "read udp 192.168.0.13:55155->208.97.182.10:53: i/o timeout",
+						},
+					},
+				},
+			},
+			"DNS lookup timed out. No response from 208.97.182.10:53 within 2 seconds.",
+		},
+		/*
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Rtt: 0,
+							Err: "dial udp: i/o timeout",
+						},
+					},
+				},
+			},
+			"DNS lookup timed out.",
+		},
+		*/
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "read udp 83.169.184.99:53: connection refused",
+						},
+					},
+				},
+			},
+			"DNS lookup refused. 83.169.184.99 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+		},
 	}
 	for _, testCase := range testCases {
 		TranslateError(&testCase.testResult)
-		translated := testCase.testResult.Result.(*CurlResult).ErrEnglish
+		var testType string
+		var translated string
+		switch testCase.testResult.Type {
+		case TypeCurl:
+			testType = "HTTP"
+			translated = testCase.testResult.Result.(*CurlResult).ErrEnglish
+		case TypeDNS:
+			testType = "DNS"
+			translated = testCase.testResult.Result.(*DNSResult).Results[0].ErrEnglish
+		}
 		if translated != testCase.expected {
-			t.Fatalf("translation mismatch: expected \"%s\", got \"%s\"", testCase.expected, translated)
+			t.Fatalf("%s error translation mismatch: expected \"%s\", got \"%s\"", testType, testCase.expected, translated)
 		}
 	}
 }

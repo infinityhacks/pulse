@@ -46,13 +46,15 @@ func TranslateError(result *CombinedResult) {
 	}
 }
 
-// translateDnsError tries to populate field ErrEnglish of a DNS test result
-// with a human friendly description of test's error, if any.
+// translateDnsError tries to populate ErrEnglish fields of a DNS test result
+// with human friendly descriptions of test's errors, if any.
 //
-// Nothing is done if ErrEnglish is already populated.
+// Nothing is done to an already populated ErrEnglish field.
 func translateDnsError(result *DNSResult) {
-	if result.ErrEnglish != "" {
-		return
+	for _, individualResult := range result.Results {
+		if individualResult.ErrEnglish != "" {
+			continue
+		}
 	}
 }
 
