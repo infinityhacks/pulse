@@ -230,6 +230,19 @@ func TestTranslateError(t *testing.T) {
 			},
 			"DNS lookup refused. 83.169.184.99 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
 		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "read udp [2400:cb00:2048:1::c629:d7a2]:53: connection refused",
+						},
+					},
+				},
+			},
+			"DNS lookup refused. 2400:cb00:2048:1::c629:d7a2 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+		},
 	}
 	for _, testCase := range testCases {
 		TranslateError(&testCase.testResult)

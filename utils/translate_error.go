@@ -49,6 +49,11 @@ func TranslateError(result *CombinedResult) {
 	}
 }
 
+/*
+ * Some people, when confronted with a problem, think "I know, I'll use regular
+ * expressions". Now they have two problems. -- by Jamie Zawinski
+ */
+
 // translateDnsError tries to populate ErrEnglish fields of a DNS test result
 // with human friendly descriptions of test's errors, if any.
 //
@@ -57,7 +62,52 @@ func translateDnsError(result *IndividualDNSResult) {
 	if result.ErrEnglish != "" {
 		return
 	}
-	result.ErrEnglish = "DNS English Translation should go here."
+
+	var pattern string
+	var re *regexp.Regexp
+	var err error
+
+	// Err: "dial udp: lookup some.site.com on 192.168.2.254:53: no such host",
+	pattern = ".*\\bdial udp: lookup (\\S+) on \\S*: no such host\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup failed. $1 could not be resolved (NXDOMAIN).",
+		)
+		return
+	}
+
+	// Err: "read udp 192.168.0.13:55155->208.97.182.10:53: i/o timeout",
+	pattern = ".*\\bread udp \\S*->(\\S+): i/o timeout\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup timed out. No response from $1 within "+
+				inIntegerSeconds(result.Rtt)+
+				" seconds.",
+		)
+		return
+	}
+
+	// Err: "read udp 83.169.184.99:53: connection refused",
+	// Err: "read udp [2400:cb00:2048:1::c629:d7a2]:53: connection refused",
+	pattern = ".*\\bread udp \\[([^]].*)]:([[:digit:]]*): connection refused\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && !re.MatchString(result.Err) {
+		pattern = ".*\\bread udp ([^:]*):([[:digit:]]*): connection refused\\b.*"
+		re, err = regexp.Compile(pattern)
+	}
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup refused. $1 refused to accept the DNS query on port ${2}. Maybe nothing is listening on that port or a firewall is blocking.",
+		)
+		return
+	}
+
 }
 
 // translateMtrError tries to populate field ErrEnglish of a MTR test result
@@ -78,11 +128,6 @@ func translateCurlError(result *CurlResult) {
 	if result.ErrEnglish != "" {
 		return
 	}
-
-	/*
-	 * Some people, when confronted with a problem, think "I know, I'll use regular
-	 * expressions". Now they have two problems. -- by Jamie Zawinski
-	 */
 
 	var pattern string
 	var re *regexp.Regexp
