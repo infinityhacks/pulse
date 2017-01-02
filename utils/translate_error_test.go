@@ -202,20 +202,20 @@ func TestTranslateError(t *testing.T) {
 			"DNS lookup timed out. No response from 208.97.182.10:53 within 2 seconds.",
 		},
 		/*
-		testCase{
-			CombinedResult{
-				Type: TypeDNS,
-				Result: &DNSResult{
-					Results: []IndividualDNSResult{
-						IndividualDNSResult{
-							Rtt: 0,
-							Err: "dial udp: i/o timeout",
+			testCase{
+				CombinedResult{
+					Type: TypeDNS,
+					Result: &DNSResult{
+						Results: []IndividualDNSResult{
+							IndividualDNSResult{
+								Rtt: 0,
+								Err: "dial udp: i/o timeout",
+							},
 						},
 					},
 				},
+				"DNS lookup timed out.",
 			},
-			"DNS lookup timed out.",
-		},
 		*/
 		testCase{
 			CombinedResult{

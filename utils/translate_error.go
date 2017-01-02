@@ -38,7 +38,10 @@ import (
 func TranslateError(result *CombinedResult) {
 	switch result.Type {
 	case TypeDNS:
-		translateDnsError(result.Result.(*DNSResult))
+		results := result.Result.(*DNSResult).Results
+		for idx, _ := range results {
+			translateDnsError(&results[idx])
+		}
 	case TypeMTR:
 		translateMtrError(result.Result.(*MtrResult))
 	case TypeCurl:
@@ -50,12 +53,11 @@ func TranslateError(result *CombinedResult) {
 // with human friendly descriptions of test's errors, if any.
 //
 // Nothing is done to an already populated ErrEnglish field.
-func translateDnsError(result *DNSResult) {
-	for _, individualResult := range result.Results {
-		if individualResult.ErrEnglish != "" {
-			continue
-		}
+func translateDnsError(result *IndividualDNSResult) {
+	if result.ErrEnglish != "" {
+		return
 	}
+	result.ErrEnglish = "DNS English Translation should go here."
 }
 
 // translateMtrError tries to populate field ErrEnglish of a MTR test result
