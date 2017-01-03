@@ -9,6 +9,13 @@ import (
 	"github.com/miekg/dns"
 )
 
+// DNS client timeouts
+var (
+	dnsDialTimeout  = time.Second * 2
+	dnsReadTimeout  = time.Second * 2
+	dnsWriteTimeout = time.Second * 2
+)
+
 type IndividualDNSResult struct {
 	Server     string        //IP/hostname the query was sent to
 	Err        string        //Any error that occurred with this particular query.
@@ -44,9 +51,9 @@ func rundnsquery(host, server string, ch chan IndividualDNSResult, qclass uint16
 	m1.Question = make([]dns.Question, 1)
 	m1.Question[0] = dns.Question{host, qclass, dns.ClassINET}
 	c := new(dns.Client)
-	c.DialTimeout = time.Second * 2
-	c.ReadTimeout = time.Second * 2
-	c.WriteTimeout = time.Second * 2
+	c.DialTimeout = dnsDialTimeout
+	c.ReadTimeout = dnsReadTimeout
+	c.WriteTimeout = dnsWriteTimeout
 	log.Println("Asking", server, "for", host)
 	msg, rtt, err := c.Exchange(m1, server)
 	res.RttStr = rtt.String()

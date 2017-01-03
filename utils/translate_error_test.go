@@ -201,22 +201,6 @@ func TestTranslateError(t *testing.T) {
 			},
 			"DNS lookup timed out. No response from 208.97.182.10:53 within 2 seconds.",
 		},
-		/*
-			testCase{
-				CombinedResult{
-					Type: TypeDNS,
-					Result: &DNSResult{
-						Results: []IndividualDNSResult{
-							IndividualDNSResult{
-								Rtt: 0,
-								Err: "dial udp: i/o timeout",
-							},
-						},
-					},
-				},
-				"DNS lookup timed out.",
-			},
-		*/
 		testCase{
 			CombinedResult{
 				Type: TypeDNS,
@@ -242,6 +226,21 @@ func TestTranslateError(t *testing.T) {
 				},
 			},
 			"DNS lookup refused. 2400:cb00:2048:1::c629:d7a2 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Rtt:    0,
+							Err:    "dial udp: i/o timeout",
+							Server: "name.server.com",
+						},
+					},
+				},
+			},
+			"DNS lookup timed out. Could not resolve name.server.com to an IP address within 2 seconds.",
 		},
 	}
 	for _, testCase := range testCases {

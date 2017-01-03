@@ -108,6 +108,21 @@ func translateDnsError(result *IndividualDNSResult) {
 		return
 	}
 
+	// Err: "dial udp: i/o timeout",
+	pattern = ".*\\bdial udp: i/o timeout\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"DNS lookup timed out. Could not resolve "+
+				result.Server+
+				" to an IP address within "+
+				inIntegerSeconds(dnsDialTimeout)+
+				" seconds.",
+		)
+		return
+	}
+
 }
 
 // translateMtrError tries to populate field ErrEnglish of a MTR test result
