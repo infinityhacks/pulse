@@ -87,6 +87,7 @@ func DNSImpl(r *DNSRequest) *DNSResult {
 	}
 	for i := 0; i < n; i++ {
 		item := <-ch
+		translateDnsError(&item)
 		res.Results[i] = item
 		//res := runquery(*host, server)
 	}

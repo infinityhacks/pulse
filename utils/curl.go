@@ -153,6 +153,7 @@ func CurlImpl(r *CurlRequest) *CurlResult {
 		r.Endpoint = fixipv6endpoint(r.Endpoint)
 	}
 	result := &CurlResult{}
+	defer translateCurlError(result)
 	var url string
 	if r.Ssl {
 		url = fmt.Sprintf("https://%s%s", r.Endpoint, r.Path)
