@@ -31,11 +31,11 @@ import (
 	"time"
 )
 
-// TranslateError tries to populate field ErrEnglish of a test result
+// translateError tries to populate field ErrEnglish of a test result
 // with a human friendly description of test's error, if any.
 //
 // Nothing is done if ErrEnglish is already populated.
-func TranslateError(result *CombinedResult) {
+func translateError(result *CombinedResult) {
 	switch result.Type {
 	case TypeDNS:
 		results := result.Result.(*DNSResult).Results

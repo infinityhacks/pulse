@@ -244,7 +244,7 @@ func TestTranslateError(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		TranslateError(&testCase.testResult)
+		translateError(&testCase.testResult)
 		var testType string
 		var translated string
 		switch testCase.testResult.Type {
