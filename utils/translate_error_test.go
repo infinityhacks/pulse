@@ -176,6 +176,15 @@ func TestTranslateError(t *testing.T) {
 		},
 		testCase{
 			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "Get https://prod.www-fastly-com.map.fastlylb.net./: x509: certificate is valid for a.ssl.fastly.net, *.a.ssl.fastly.net, rvm.io, not www.nos.nl",
+				},
+			},
+			"Certificate is not valid for www.nos.nl",
+		},
+		testCase{
+			CombinedResult{
 				Type: TypeDNS,
 				Result: &DNSResult{
 					Results: []IndividualDNSResult{

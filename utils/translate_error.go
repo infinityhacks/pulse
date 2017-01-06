@@ -264,6 +264,17 @@ func translateCurlError(result *CurlResult) {
 		return
 	}
 
+	// Err: "Get https://prod.www-fastly-com.map.fastlylb.net./: x509: certificate is valid for a.ssl.fastly.net, *.a.ssl.fastly.net, rvm.io, not www.nos.nl",
+	pattern = ".*\\bx509: certificate is valid for .*, not (\\S+)\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Certificate is not valid for $1",
+		)
+		return
+	}
+
 }
 
 // inIntegerSeconds formats a Duration to an integer number of seconds.
