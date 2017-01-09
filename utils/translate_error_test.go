@@ -27,6 +27,7 @@ package pulse
 
 import (
 	"testing"
+
 	"github.com/miekg/dns"
 )
 
@@ -298,13 +299,12 @@ func TestTranslateErrorCurl(t *testing.T) {
 				Path:     "/",
 				Endpoint: "8.8.8.8",
 			},
-			"Donnection timed out. Could not connect to 8.8.8.8:80 within 15 seconds.",
+			"Connection timed out. Could not connect to 8.8.8.8:80 within 15 seconds.",
 		},
 	}
 	for _, testCase := range testCases {
 		resp := CurlImpl(testCase.request)
-		if resp.ErrEnglish != testCase.expected {
-			t.Log(testCase.request)
+		if resp.Err != "" && resp.ErrEnglish != testCase.expected {
 			t.Log(resp)
 			t.Errorf("%s error translation mismatch for error '%s': expected \"%s\", got \"%s\"", "HTTP", resp.Err, testCase.expected, resp.ErrEnglish)
 		}
@@ -319,9 +319,9 @@ func TestTranslateErrorDns(t *testing.T) {
 	testCases := []testCase{
 		testCase{
 			&DNSRequest{
-				Host:    "some.site.com.",
-				QType:   dns.TypeA,
-				Targets: []string{"unresolvable.nameserver:53"},
+				Host:        "some.site.com.",
+				QType:       dns.TypeA,
+				Targets:     []string{"unresolvable.nameserver:53"},
 				NoRecursion: false,
 			},
 			"DNS lookup failed. unresolvable.nameserver could not be resolved (NXDOMAIN).",
@@ -329,9 +329,9 @@ func TestTranslateErrorDns(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		resp := DNSImpl(testCase.request)
-		//t.Log(resp)
 		translated := resp.Results[0].ErrEnglish
-		if translated != testCase.expected {
+		if resp.Results[0].Err != "" && translated != testCase.expected {
+			t.Log(resp.Results[0])
 			t.Errorf("%s error translation mismatch: expected \"%s\", got \"%s\"", "DNS", testCase.expected, translated)
 		}
 	}
