@@ -298,12 +298,14 @@ func TestTranslateErrorCurl(t *testing.T) {
 				Path:     "/",
 				Endpoint: "8.8.8.8",
 			},
-			"Connection timed out. Could not connect to 8.8.8.8:80 within 15 seconds.",
+			"Donnection timed out. Could not connect to 8.8.8.8:80 within 15 seconds.",
 		},
 	}
 	for _, testCase := range testCases {
 		resp := CurlImpl(testCase.request)
 		if resp.ErrEnglish != testCase.expected {
+			t.Log(testCase.request)
+			t.Log(resp)
 			t.Errorf("%s error translation mismatch for error '%s': expected \"%s\", got \"%s\"", "HTTP", resp.Err, testCase.expected, resp.ErrEnglish)
 		}
 	}
