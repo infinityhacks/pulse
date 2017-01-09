@@ -49,11 +49,6 @@ func translateError(result *CombinedResult) {
 	}
 }
 
-/*
- * Some people, when confronted with a problem, think "I know, I'll use regular
- * expressions". Now they have two problems. -- by Jamie Zawinski
- */
-
 // translateDnsError tries to populate ErrEnglish fields of a DNS test result
 // with human friendly descriptions of test's errors, if any.
 //
@@ -63,6 +58,8 @@ func translateDnsError(result *IndividualDNSResult) {
 		return
 	}
 
+	 // Some people, when confronted with a problem, think "I know, I'll use
+	 // regular expressions". Now they have two problems. -- by Jamie Zawinski
 	var pattern string
 	var re *regexp.Regexp
 	var err error
@@ -144,6 +141,8 @@ func translateCurlError(result *CurlResult) {
 		return
 	}
 
+	 // Some people, when confronted with a problem, think "I know, I'll use
+	 // regular expressions". Now they have two problems. -- by Jamie Zawinski
 	var pattern string
 	var re *regexp.Regexp
 	var err error
@@ -271,6 +270,17 @@ func translateCurlError(result *CurlResult) {
 		result.ErrEnglish = re.ReplaceAllString(
 			result.Err,
 			"Certificate is not valid for $1",
+		)
+		return
+	}
+
+	// Err: "Get https://some.site.com/ali-mod/??alicloud-assets-footer/0.0.86/index.css: net/http: TLS handshake timeout",
+	pattern = ".*\\bnet/http: TLS handshake timeout\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"TLS handshake timed out.",
 		)
 		return
 	}

@@ -185,6 +185,15 @@ func TestTranslateError(t *testing.T) {
 		},
 		testCase{
 			CombinedResult{
+				Type: TypeCurl,
+				Result: &CurlResult{
+					Err: "Get https://some.site.com/ali-mod/??alicloud-assets-footer/0.0.86/index.css: net/http: TLS handshake timeout",
+				},
+			},
+			"TLS handshake timed out.",
+		},
+		testCase{
+			CombinedResult{
 				Type: TypeDNS,
 				Result: &DNSResult{
 					Results: []IndividualDNSResult{
