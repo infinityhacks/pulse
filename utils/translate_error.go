@@ -58,8 +58,8 @@ func translateDnsError(result *IndividualDNSResult) {
 		return
 	}
 
-	 // Some people, when confronted with a problem, think "I know, I'll use
-	 // regular expressions". Now they have two problems. -- by Jamie Zawinski
+	// Some people, when confronted with a problem, think "I know, I'll use
+	// regular expressions". Now they have two problems. -- by Jamie Zawinski
 	var pattern string
 	var re *regexp.Regexp
 	var err error
@@ -141,8 +141,8 @@ func translateCurlError(result *CurlResult) {
 		return
 	}
 
-	 // Some people, when confronted with a problem, think "I know, I'll use
-	 // regular expressions". Now they have two problems. -- by Jamie Zawinski
+	// Some people, when confronted with a problem, think "I know, I'll use
+	// regular expressions". Now they have two problems. -- by Jamie Zawinski
 	var pattern string
 	var re *regexp.Regexp
 	var err error

@@ -27,9 +27,10 @@ package pulse
 
 import (
 	"testing"
+	"github.com/miekg/dns"
 )
 
-func TestTranslateError(t *testing.T) {
+func TestTranslateErrorStatic(t *testing.T) {
 	type testCase struct {
 		testResult CombinedResult
 		expected   string
@@ -275,6 +276,54 @@ func TestTranslateError(t *testing.T) {
 		}
 		if translated != testCase.expected {
 			t.Fatalf("%s error translation mismatch: expected \"%s\", got \"%s\"", testType, testCase.expected, translated)
+		}
+	}
+}
+
+func TestTranslateErrorCurl(t *testing.T) {
+	type testCase struct {
+		request  *CurlRequest
+		expected string
+	}
+	testCases := []testCase{
+		testCase{
+			&CurlRequest{
+				Path:     "/",
+				Endpoint: "some.site.com",
+			},
+			"DNS lookup failed. some.site.com could not be resolved (NXDOMAIN).",
+		},
+	}
+	for _, testCase := range testCases {
+		resp := CurlImpl(testCase.request)
+		if resp.ErrEnglish != testCase.expected {
+			t.Errorf("%s error translation mismatch: expected \"%s\", got \"%s\"", "HTTP", testCase.expected, resp.ErrEnglish)
+		}
+	}
+}
+
+func TestTranslateErrorDns(t *testing.T) {
+	type testCase struct {
+		request  *DNSRequest
+		expected string
+	}
+	testCases := []testCase{
+		testCase{
+			&DNSRequest{
+				Host:    "some.site.com.",
+				QType:   dns.TypeA,
+				Targets: []string{"unresolvable.nameserver:53"},
+				NoRecursion: false,
+			},
+			"DNS lookup failed. unresolvable.nameserver could not be resolved (NXDOMAIN).",
+		},
+	}
+	for _, testCase := range testCases {
+		resp := DNSImpl(testCase.request)
+		//t.Log(resp)
+		translated := resp.Results[0].ErrEnglish
+		if translated != testCase.expected {
+			t.Errorf("%s error translation mismatch: expected \"%s\", got \"%s\"", "DNS", testCase.expected, translated)
 		}
 	}
 }
