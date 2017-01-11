@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/openpgp"
 )
@@ -59,16 +60,53 @@ type Updater struct {
 	Current string
 	bindir  string
 	crtdir  string
+	android AndroidService
 }
 
-func NewUpdater(bindir, crtdir string) *Updater {
-	return &Updater{
-		bindir: bindir,
-		crtdir: crtdir,
+//AndroidService is an interface created from Java that allows pulseandroid to do various tasks
+// that need to be done from Java side
+type AndroidService interface {
+	GetConState() string       //Returns a string representation of connection type and signal strength.
+	SensSMS(dest, body string) //Send an outgoing SMS to dest with payload body
+	SendUSSN(dest string)      //Send USSN command
+	SetStatus(status string)   //Set a status to show to user
+	SetCSR(csr string)         //Set CSR to show in UI
+}
+
+func NewUpdater(bindir, crtdir string, android AndroidService) *Updater {
+	u := &Updater{
+		bindir:  bindir,
+		crtdir:  crtdir,
+		android: android,
 	}
+	u.android.SetStatus("Initializing")
+	return u
+}
+
+//IngestSMS receives sender number and payload
+func (u *Updater) IngestSMS(src, body string) {
+	//TODO
+}
+
+//IngestUSSN receives incoming USSN message payload
+func (u *Updater) IngestUSSN(body string) {
+	//TODO
+}
+
+//IngestLog receives a line of log
+func (u *Updater) IngestLog(line string) {
+	//TODO
+}
+
+//LogDataUsage logs bytes used over network since last boot
+func (u *Updater) LogDataUsage(rx, tx, total int64) {
+	//TODO
+	//Store the time and update and on subsiquent updates do a diff
 }
 
 func (u *Updater) Update() (result *Result) {
+	u.android.SetStatus("Checking for updates")
+	u.android.SetCSR("")
 	result = &Result{}
 	needsupdate := false
 	//Check if we are on latest version...
@@ -90,6 +128,7 @@ func (u *Updater) Update() (result *Result) {
 	}
 
 	if needsupdate {
+		u.android.SetStatus("Updating")
 		log.Println("Need to upgrade...")
 		//Download the files...
 		err = downloadfile("https://tb-minion.turbobytes.net/minion.android.arm.tar.gz", u.bindir+"/minion.android.arm.tar.gz")
@@ -127,6 +166,8 @@ func (u *Updater) Update() (result *Result) {
 		log.Println("crt number exists")
 		if err == nil {
 			result.Crt = body
+			u.android.SetStatus("CSR: " + body)
+			u.android.SetCSR(body)
 		} else {
 			log.Println("crt number does not exists")
 			body, err = readtextfile(u.crtdir + "/minion.crt.request")
@@ -162,6 +203,8 @@ func (u *Updater) Update() (result *Result) {
 				return
 			}
 			result.Crt = string(d)
+			u.android.SetStatus("CSR: " + string(d))
+			u.android.SetCSR(string(d))
 		}
 	}
 	return
@@ -177,9 +220,20 @@ func fileexists(fname string) bool {
 	return true
 }
 
-func (u *Updater) Exec() string {
+func (u *Updater) ConStateExample() {
+	for {
+		st := time.Now()
+		log.Println(u.android.GetConState())
+		log.Println("GetConState() took:", time.Since(st))
+		time.Sleep(time.Minute)
+	}
+}
+
+func (u *Updater) Exec(cnc string) string {
+	go u.ConStateExample()
+	u.android.SetStatus("Launching agent binary to " + cnc)
 	log.Println("BIN", u.bindir+"/minion")
-	cmd := exec.Command(u.bindir+"/minion", "-cnc", "distdns.turbobytes.com:7777")
+	cmd := exec.Command(u.bindir+"/minion", "-cnc", cnc)
 	cmd.Dir = u.crtdir
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
