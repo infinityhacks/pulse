@@ -1,12 +1,14 @@
 package pulse
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 //Tests if we can fetch a file from S3 or not...
@@ -17,7 +19,7 @@ func TestCurlS3(t *testing.T) {
 		Host:     "s3.amazonaws.com",
 		Ssl:      true,
 	}
-	resp := CurlImpl(req)
+	resp := CurlImpl(context.Background(), req)
 	if resp.Err != "" {
 		t.Error(resp.Err)
 	}
@@ -34,7 +36,7 @@ func TestCurlInvalidS3(t *testing.T) {
 		Host:     "www.turbobytes.com", //Bogus Host header not configured with S3
 		Ssl:      false,
 	}
-	resp := CurlImpl(req)
+	resp := CurlImpl(context.Background(), req)
 	if resp.Err != "" {
 		t.Error(resp.Err)
 	}
@@ -56,7 +58,7 @@ func TestCurlLocalBlock(t *testing.T) {
 		Host:     url.Host,
 		Ssl:      false,
 	}
-	resp := CurlImpl(req)
+	resp := CurlImpl(context.Background(), req)
 	if !strings.Contains(resp.Err, securityerr.Error()) {
 		t.Error("Security err should have been raised")
 	}
@@ -87,6 +89,26 @@ func TestFixipv6endpoint(t *testing.T) {
 		if fixed != expected {
 			t.Errorf("%s should become %s, got %s", ep, expected, fixed)
 		}
+	}
+}
+
+//Tests if CurlImpl honors deadlines
+func TestCurlHardTimeout(t *testing.T) {
+	timeout := time.Millisecond
+	req := &CurlRequest{
+		Path:     "/",
+		Endpoint: "www.google.com",
+		Host:     "www.google.com",
+		Ssl:      true,
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(timeout))
+	resp := CurlImpl(ctx, req)
+	cancel()
+	if !strings.Contains(resp.Err, "request canceled") {
+		t.Errorf("unexpected error: %s", resp.Err)
+	}
+	if resp.Status != 0 {
+		t.Error("Status should be 0... got ", resp.Status)
 	}
 }
 

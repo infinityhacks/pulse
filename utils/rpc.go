@@ -1,6 +1,7 @@
 package pulse
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"time"
@@ -78,7 +79,7 @@ func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
 		if !ok {
 			tmp.Err = "Error parsing request"
 		} else {
-			tmp.Result = CurlImpl(&args)
+			tmp.Result = CurlImpl(context.Background(), &args)
 		}
 	default:
 		//ERR
