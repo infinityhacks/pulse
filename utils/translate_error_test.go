@@ -26,6 +26,7 @@
 package pulse
 
 import (
+	"context"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -303,7 +304,7 @@ func TestTranslateErrorCurl(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		resp := CurlImpl(testCase.request)
+		resp := CurlImpl(context.Background(), testCase.request)
 		if resp.Err != "" && resp.ErrEnglish != testCase.expected {
 			t.Log(resp)
 			t.Errorf("%s error translation mismatch for error '%s': expected \"%s\", got \"%s\"", "HTTP", resp.Err, testCase.expected, resp.ErrEnglish)
@@ -328,7 +329,7 @@ func TestTranslateErrorDns(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		resp := DNSImpl(testCase.request)
+		resp := DNSImpl(context.Background(), testCase.request)
 		translated := resp.Results[0].ErrEnglish
 		if resp.Results[0].Err != "" && translated != testCase.expected {
 			t.Log(resp.Results[0])

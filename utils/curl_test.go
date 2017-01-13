@@ -93,18 +93,17 @@ func TestFixipv6endpoint(t *testing.T) {
 }
 
 //Tests if CurlImpl honors deadlines
-func TestCurlHardTimeout(t *testing.T) {
-	timeout := time.Millisecond
+func TestCurlWithTimeout(t *testing.T) {
 	req := &CurlRequest{
 		Path:     "/",
 		Endpoint: "www.google.com",
 		Host:     "www.google.com",
 		Ssl:      true,
 	}
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(timeout))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	resp := CurlImpl(ctx, req)
 	cancel()
-	if !strings.Contains(resp.Err, "request canceled") {
+	if !strings.Contains(resp.Err, "request canceled") && !strings.Contains(resp.Err, "context deadline exceeded") {
 		t.Errorf("unexpected error: %s", resp.Err)
 	}
 	if resp.Status != 0 {
