@@ -55,7 +55,7 @@ type CombinedResult struct {
 }
 
 func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), hardTimeout)
 	st := time.Now()
 	tmp := new(CombinedResult)
 	tmp.Type = req.Type
@@ -74,7 +74,7 @@ func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
 		if !ok {
 			tmp.Err = "Error parsing request"
 		} else {
-			tmp.Result = MtrImpl(&args)
+			tmp.Result = MtrImpl(ctx, &args)
 		}
 	case TypeCurl:
 		//Run curl and populate result
@@ -88,6 +88,7 @@ func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
 		//ERR
 		tmp.Err = fmt.Sprintf("Unknown test type : %d", req.Type)
 	}
+	cancel()
 	tmp.CompletedAt = time.Now()
 	tmp.Version = r.Version
 	tmp.TimeTaken = time.Since(st)
