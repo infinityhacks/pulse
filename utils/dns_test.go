@@ -128,4 +128,7 @@ func TestDNSImplWithTimeout(t *testing.T) {
 	if !strings.Contains(resp.Results[0].Err, "context deadline exceeded") {
 		t.Errorf("unexpected error: %s", resp.Results[0].Err)
 	}
+	if resp.Results[0].ErrEnglish != "Test was cancelled because agent was unresponsible for 50 seconds during test execution. This may indicate agent is malfunctioning; please inform maintainers." {
+		t.Errorf("unexpected ErrEnglish: %s", resp.Results[0].ErrEnglish)
+	}
 }

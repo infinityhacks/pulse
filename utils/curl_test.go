@@ -103,7 +103,13 @@ func TestCurlWithTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	resp := CurlImpl(ctx, req)
 	cancel()
-	if !strings.Contains(resp.Err, "request canceled") && !strings.Contains(resp.Err, "context deadline exceeded") {
+	if strings.Contains(resp.Err, "request canceled while waiting for connection") {
+		// Assume this is due to the tiny deadline used during the test.
+	} else if strings.Contains(resp.Err, "context deadline exceeded") {
+		if resp.ErrEnglish != "Test was cancelled because agent was unresponsible for 50 seconds during test execution. This may indicate agent is malfunctioning; please inform maintainers." {
+			t.Errorf("unexpected ErrEnglish: %s", resp.ErrEnglish)
+		}
+	} else {
 		t.Errorf("unexpected error: %s", resp.Err)
 	}
 	if resp.Status != 0 {
