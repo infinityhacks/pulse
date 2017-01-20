@@ -9,16 +9,24 @@ import (
 	"github.com/miekg/dns"
 )
 
+// DNS client timeouts
+var (
+	dnsDialTimeout  = time.Second * 2
+	dnsReadTimeout  = time.Second * 2
+	dnsWriteTimeout = time.Second * 2
+)
+
 type IndividualDNSResult struct {
-	Server   string        //IP/hostname the query was sent to
-	Err      string        //Any error that occurred with this particular query.
-	RttStr   string        //Round trip time in humanized form
-	Rtt      time.Duration //Round trip time
-	Raw      []byte        //Raw packet
-	Formated string        //Dig style formating
-	Msg      *dns.Msg      //Parsed DNS message
-	ASN      *string       //ASN of Server
-	ASName   *string       //ASN description
+	Server     string        //IP/hostname the query was sent to
+	Err        string        //Any error that occurred with this particular query.
+	ErrEnglish string        //Human friendly version of Err
+	RttStr     string        //Round trip time in humanized form
+	Rtt        time.Duration //Round trip time
+	Raw        []byte        //Raw packet
+	Formated   string        //Dig style formating
+	Msg        *dns.Msg      //Parsed DNS message
+	ASN        *string       //ASN of Server
+	ASName     *string       //ASN description
 }
 
 type DNSResult struct {
@@ -43,9 +51,9 @@ func rundnsquery(host, server string, ch chan IndividualDNSResult, qclass uint16
 	m1.Question = make([]dns.Question, 1)
 	m1.Question[0] = dns.Question{host, qclass, dns.ClassINET}
 	c := new(dns.Client)
-	c.DialTimeout = time.Second * 2
-	c.ReadTimeout = time.Second * 2
-	c.WriteTimeout = time.Second * 2
+	c.DialTimeout = dnsDialTimeout
+	c.ReadTimeout = dnsReadTimeout
+	c.WriteTimeout = dnsWriteTimeout
 	log.Println("Asking", server, "for", host)
 	msg, rtt, err := c.Exchange(m1, server)
 	res.RttStr = rtt.String()
@@ -79,6 +87,7 @@ func DNSImpl(r *DNSRequest) *DNSResult {
 	}
 	for i := 0; i < n; i++ {
 		item := <-ch
+		translateDnsError(&item)
 		res.Results[i] = item
 		//res := runquery(*host, server)
 	}
