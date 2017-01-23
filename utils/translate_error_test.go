@@ -260,7 +260,7 @@ func TestTranslateErrorStatic(t *testing.T) {
 					},
 				},
 			},
-			"DNS lookup timed out. Could not resolve name.server.com to an IP address within 2 seconds.",
+			"DNS lookup timed out. Could not resolve name.server.com to an IP address within 5 seconds.",
 		},
 	}
 	for _, testCase := range testCases {

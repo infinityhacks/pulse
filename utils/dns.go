@@ -11,9 +11,7 @@ import (
 
 // DNS client timeouts
 var (
-	dnsDialTimeout  = time.Second * 2
-	dnsReadTimeout  = time.Second * 2
-	dnsWriteTimeout = time.Second * 2
+	dnsTimeout = time.Second * 5
 )
 
 type IndividualDNSResult struct {
@@ -51,9 +49,7 @@ func rundnsquery(host, server string, ch chan IndividualDNSResult, qclass uint16
 	m1.Question = make([]dns.Question, 1)
 	m1.Question[0] = dns.Question{host, qclass, dns.ClassINET}
 	c := new(dns.Client)
-	c.DialTimeout = dnsDialTimeout
-	c.ReadTimeout = dnsReadTimeout
-	c.WriteTimeout = dnsWriteTimeout
+	c.Timeout = dnsTimeout
 	log.Println("Asking", server, "for", host)
 	msg, rtt, err := c.Exchange(m1, server)
 	res.RttStr = rtt.String()

@@ -114,7 +114,7 @@ func translateDnsError(result *IndividualDNSResult) {
 			"DNS lookup timed out. Could not resolve "+
 				result.Server+
 				" to an IP address within "+
-				inIntegerSeconds(dnsDialTimeout)+
+				inIntegerSeconds(dnsTimeout)+
 				" seconds.",
 		)
 		return
