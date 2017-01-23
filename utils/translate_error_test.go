@@ -232,7 +232,33 @@ func TestTranslateErrorStatic(t *testing.T) {
 					},
 				},
 			},
-			"DNS lookup refused. 83.169.184.99 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+			"DNS lookup refused. 83.169.184.99 refused to accept the DNS query on port 53.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "read udp 83.169.184.98:53: read: connection refused",
+						},
+					},
+				},
+			},
+			"DNS lookup refused. 83.169.184.98 refused to accept the DNS query on port 53.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "read udp 104.236.65.170:38722->83.169.184.97:53: read: connection refused",
+						},
+					},
+				},
+			},
+			"DNS lookup refused. 83.169.184.97 refused to accept the DNS query on port 53.",
 		},
 		testCase{
 			CombinedResult{
@@ -245,7 +271,7 @@ func TestTranslateErrorStatic(t *testing.T) {
 					},
 				},
 			},
-			"DNS lookup refused. 2400:cb00:2048:1::c629:d7a2 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+			"DNS lookup refused. 2400:cb00:2048:1::c629:d7a2 refused to accept the DNS query on port 53.",
 		},
 		testCase{
 			CombinedResult{
