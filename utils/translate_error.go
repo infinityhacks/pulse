@@ -211,7 +211,7 @@ func translateCurlError(result *CurlResult) {
 			replacement = "DNS lookup timed out. Could not resolve $1 within " +
 				inIntegerSeconds(result.DialTime) +
 				" seconds."
-		} else if result.DNSTime <= dnsTimeout {
+		} else if result.DNSTime <= time.Second * 5 {
 			if ipv6 {
 				replacement = "Could not connect to [${1}]:${2} within " +
 					inIntegerSeconds(result.ConnectTime) +
