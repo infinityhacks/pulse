@@ -122,6 +122,21 @@ func translateDnsError(result *IndividualDNSResult) {
 		return
 	}
 
+	// Err: "context deadline exceeded"
+	pattern = ".*\\bcontext deadline exceeded\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Test was cancelled because agent was unresponsible for "+
+				inIntegerSeconds(hardTimeout)+
+				" seconds during test execution. "+
+				"This may indicate agent is malfunctioning; "+
+				"please inform maintainers.",
+		)
+		return
+	}
+
 }
 
 // translateMtrError tries to populate field ErrEnglish of a MTR test result
@@ -132,6 +147,26 @@ func translateMtrError(result *MtrResult) {
 	if result.ErrEnglish != "" {
 		return
 	}
+
+	var pattern string
+	var re *regexp.Regexp
+	var err error
+
+	// Err: "context deadline exceeded"
+	pattern = ".*\\bcontext deadline exceeded\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Test was cancelled because agent was unresponsible for "+
+				inIntegerSeconds(hardTimeout)+
+				" seconds during test execution. "+
+				"This may indicate agent is malfunctioning; "+
+				"please inform maintainers.",
+		)
+		return
+	}
+
 }
 
 // translateCurlError tries to populate field ErrEnglish of a Curl test result
@@ -297,6 +332,21 @@ func translateCurlError(result *CurlResult) {
 		result.ErrEnglish = re.ReplaceAllString(
 			result.Err,
 			"TLS handshake timed out.",
+		)
+		return
+	}
+
+	// Err: "context deadline exceeded"
+	pattern = ".*\\bcontext deadline exceeded\\b.*"
+	re, err = regexp.Compile(pattern)
+	if err == nil && re.MatchString(result.Err) {
+		result.ErrEnglish = re.ReplaceAllString(
+			result.Err,
+			"Test was cancelled because agent was unresponsible for "+
+				inIntegerSeconds(hardTimeout)+
+				" seconds during test execution. "+
+				"This may indicate agent is malfunctioning; "+
+				"please inform maintainers.",
 		)
 		return
 	}

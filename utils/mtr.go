@@ -1,6 +1,7 @@
 package pulse
 
 import (
+	"context"
 	"math/big"
 	"strings"
 
@@ -19,18 +20,24 @@ type MtrRequest struct {
 	AgentFilter []*big.Int
 }
 
-func MtrImpl(r *MtrRequest) *MtrResult {
+func MtrImpl(ctx context.Context, r *MtrRequest) *MtrResult {
+	var result MtrResult
+	defer translateMtrError(&result)
 	//Validate r.Target before sending
 	tgt := strings.Trim(r.Target, "\n \r") //Trim whitespace
 	if strings.Contains(tgt, " ") {        //Ensure it doesn't contain space
-		return &MtrResult{nil, "Invalid hostname", ""}
+		result.Err = "Invalid hostname"
+		return &result
 	}
 	if strings.HasPrefix(tgt, "-") { //Ensure it doesn't start with -
-		return &MtrResult{nil, "Invalid hostname", ""}
+		result.Err = "Invalid hostname"
+		return &result
 	}
-	out, err := mtrparser.ExecuteMTR(tgt, r.IPv)
+	out, err := mtrparser.ExecuteMTRContext(ctx, tgt, r.IPv)
 	if err != nil {
-		return &MtrResult{nil, err.Error(), ""}
+		result.Err = err.Error()
+		return &result
 	}
-	return &MtrResult{out, "", ""}
+	result.Result = out
+	return &result
 }

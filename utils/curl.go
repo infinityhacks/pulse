@@ -147,7 +147,7 @@ func fixipv6endpoint(endpoint string) string {
 	return endpoint
 }
 
-func CurlImpl(r *CurlRequest) *CurlResult {
+func CurlImpl(ctx context.Context, r *CurlRequest) *CurlResult {
 	//Fix the endpoint, only when running https test
 	if r.Ssl {
 		r.Endpoint = fixipv6endpoint(r.Endpoint)
@@ -166,6 +166,7 @@ func CurlImpl(r *CurlRequest) *CurlResult {
 		result.Err = err.Error()
 		return result
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("User-Agent", useragent)
 	//Override Host header if needed
 	tlshost := r.Endpoint //Validate with endpoint if no host given
@@ -219,6 +220,7 @@ func CurlImpl(r *CurlRequest) *CurlResult {
 			//Make mock req to kick in onceSetNextProtoDefaults()
 			server := httptest.NewServer(http.HandlerFunc(http.NotFound))
 			reqtmp, _ := http.NewRequest("GET", server.URL, nil)
+			reqtmp = reqtmp.WithContext(ctx)
 			client.Do(reqtmp) //Don't care about response..
 			//Now mess with TLSClientConfig
 			transport.TLSClientConfig.ServerName = tlshost
