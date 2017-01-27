@@ -97,7 +97,7 @@ func TestTranslateErrorStatic(t *testing.T) {
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					ConnectTime: 1.4001603612e+10,
+					ConnectTime: 1.4101603612e+10,
 					DNSTime:     0.1001603612e+10,
 					DialTime:    1.5001603612e+10,
 					TLSTime:     0,
@@ -105,21 +105,21 @@ func TestTranslateErrorStatic(t *testing.T) {
 					Err:         "Get http://some.site.com/: dial tcp some.site.com:80: i/o timeout",
 				},
 			},
-			"Lookup with connection timed out. Could not perform DNS lookup and TCP connection to some.site.com within 15 seconds. (DNS lookup 1002ms, TCP connect 14002ms)",
+			"Could not connect to some.site.com:80 within 14 seconds. (DNS lookup 1002ms)",
 		},
 		testCase{
 			CombinedResult{
 				Type: TypeCurl,
 				Result: &CurlResult{
-					ConnectTime: 1.4101603612e+10,
-					DNSTime:     0.0901603612e+10,
+					ConnectTime: 0.9001603612e+10,
+					DNSTime:     0.6001603612e+10,
 					DialTime:    1.5001603612e+10,
 					TLSTime:     0,
 					Ttfb:        0,
 					Err:         "Get http://some.site.com/: dial tcp some.site.com:80: i/o timeout",
 				},
 			},
-			"Lookup with connection timed out. Could not perform DNS lookup and TCP connection to some.site.com within 15 seconds. (DNS lookup 902ms, TCP connect 14102ms)",
+			"Lookup with connection timed out. Could not perform DNS lookup and TCP connection to some.site.com within 15 seconds. (DNS lookup 6002ms, TCP connect 9002ms)",
 		},
 		testCase{
 			CombinedResult{
@@ -232,7 +232,33 @@ func TestTranslateErrorStatic(t *testing.T) {
 					},
 				},
 			},
-			"DNS lookup refused. 83.169.184.99 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+			"DNS lookup refused. 83.169.184.99 refused to accept the DNS query on port 53.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "read udp 83.169.184.98:53: read: connection refused",
+						},
+					},
+				},
+			},
+			"DNS lookup refused. 83.169.184.98 refused to accept the DNS query on port 53.",
+		},
+		testCase{
+			CombinedResult{
+				Type: TypeDNS,
+				Result: &DNSResult{
+					Results: []IndividualDNSResult{
+						IndividualDNSResult{
+							Err: "read udp 104.236.65.170:38722->83.169.184.97:53: read: connection refused",
+						},
+					},
+				},
+			},
+			"DNS lookup refused. 83.169.184.97 refused to accept the DNS query on port 53.",
 		},
 		testCase{
 			CombinedResult{
@@ -245,7 +271,7 @@ func TestTranslateErrorStatic(t *testing.T) {
 					},
 				},
 			},
-			"DNS lookup refused. 2400:cb00:2048:1::c629:d7a2 refused to accept the DNS query on port 53. Maybe nothing is listening on that port or a firewall is blocking.",
+			"DNS lookup refused. 2400:cb00:2048:1::c629:d7a2 refused to accept the DNS query on port 53.",
 		},
 		testCase{
 			CombinedResult{
@@ -260,7 +286,7 @@ func TestTranslateErrorStatic(t *testing.T) {
 					},
 				},
 			},
-			"DNS lookup timed out. Could not resolve name.server.com to an IP address within 2 seconds.",
+			"DNS lookup timed out. Could not resolve name.server.com to an IP address within 5 seconds.",
 		},
 	}
 	for _, testCase := range testCases {

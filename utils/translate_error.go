@@ -89,18 +89,20 @@ func translateDnsError(result *IndividualDNSResult) {
 	}
 
 	// Err: "read udp 83.169.184.99:53: connection refused",
+	// Err: "read udp 83.169.184.99:53: read: connection refused",
 	// Err: "read udp [2400:cb00:2048:1::c629:d7a2]:53: connection refused",
-	pattern = ".*\\bread udp \\[([^]].*)]:([[:digit:]]*): connection refused\\b.*"
+	// Err: "read udp 104.236.65.170:38722->83.169.184.99:53: read: connection refused"
+	pattern = ".*\\bread udp (?:\\S*->)?\\[([^]].*)]:([[:digit:]]*): .*\\bconnection refused\\b.*"
 	re, err = regexp.Compile(pattern)
 	if err == nil && !re.MatchString(result.Err) {
-		pattern = ".*\\bread udp ([^:]*):([[:digit:]]*): connection refused\\b.*"
+		pattern = ".*\\bread udp (?:\\S*->)?([^:]*):([[:digit:]]*): .*\\bconnection refused\\b.*"
 		re, err = regexp.Compile(pattern)
 	}
 	re, err = regexp.Compile(pattern)
 	if err == nil && re.MatchString(result.Err) {
 		result.ErrEnglish = re.ReplaceAllString(
 			result.Err,
-			"DNS lookup refused. $1 refused to accept the DNS query on port ${2}. Maybe nothing is listening on that port or a firewall is blocking.",
+			"DNS lookup refused. $1 refused to accept the DNS query on port ${2}.",
 		)
 		return
 	}
@@ -114,7 +116,7 @@ func translateDnsError(result *IndividualDNSResult) {
 			"DNS lookup timed out. Could not resolve "+
 				result.Server+
 				" to an IP address within "+
-				inIntegerSeconds(dnsDialTimeout)+
+				inIntegerSeconds(dnsTimeout)+
 				" seconds.",
 		)
 		return
@@ -209,6 +211,20 @@ func translateCurlError(result *CurlResult) {
 			replacement = "DNS lookup timed out. Could not resolve $1 within " +
 				inIntegerSeconds(result.DialTime) +
 				" seconds."
+		} else if result.DNSTime <= time.Second * 5 {
+			if ipv6 {
+				replacement = "Could not connect to [${1}]:${2} within " +
+					inIntegerSeconds(result.ConnectTime) +
+					" seconds. (DNS lookup " +
+					inIntegerMilli(result.DNSTime) +
+					"ms)"
+			} else {
+				replacement = "Could not connect to ${1}:${2} within " +
+					inIntegerSeconds(result.ConnectTime) +
+					" seconds. (DNS lookup " +
+					inIntegerMilli(result.DNSTime) +
+					"ms)"
+			}
 		} else {
 			replacement = "Lookup with connection timed out. Could not perform DNS lookup and TCP connection to $1 within " +
 				inIntegerSeconds(result.DialTime) +
