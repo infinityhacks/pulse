@@ -67,7 +67,7 @@ type Updater struct {
 // that need to be done from Java side
 type AndroidService interface {
 	GetConState() string       //Returns a string representation of connection type and signal strength.
-	SensSMS(dest, body string) //Send an outgoing SMS to dest with payload body
+	SendSMS(dest, body string) //Send an outgoing SMS to dest with payload body
 	SendUSSN(dest string)      //Send USSN command
 	SetStatus(status string)   //Set a status to show to user
 	SetCSR(csr string)         //Set CSR to show in UI
