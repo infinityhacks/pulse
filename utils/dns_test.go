@@ -1,8 +1,10 @@
 package pulse
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,7 +75,7 @@ func TestDNSImpl(t *testing.T) {
 	}
 	//Run query
 	//t.Log("querying")
-	resp := DNSImpl(req)
+	resp := DNSImpl(context.Background(), req)
 	//Perform checks
 	if resp.Err != "" {
 		t.Fatalf(resp.Err)
@@ -110,5 +112,23 @@ func TestDNSImpl(t *testing.T) {
 	}
 	if arec.A.String() != "1.1.1.1" {
 		t.Errorf("Expected 1.1.1.1, got %d", arec.A.String())
+	}
+}
+
+func TestDNSImplWithTimeout(t *testing.T) {
+	req := &DNSRequest{
+		Host:        "www.google.com.",
+		QType:       dns.TypeA,
+		Targets:     []string{"8.8.8.8:53"},
+		NoRecursion: false,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	resp := DNSImpl(ctx, req)
+	cancel()
+	if !strings.Contains(resp.Results[0].Err, "context deadline exceeded") {
+		t.Errorf("unexpected error: %s", resp.Results[0].Err)
+	}
+	if resp.Results[0].ErrEnglish != "Test was cancelled because agent was unresponsible for 50 seconds during test execution. This may indicate agent is malfunctioning; please inform maintainers." {
+		t.Errorf("unexpected ErrEnglish: %s", resp.Results[0].ErrEnglish)
 	}
 }

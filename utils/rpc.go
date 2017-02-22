@@ -1,6 +1,7 @@
 package pulse
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"time"
@@ -9,6 +10,8 @@ import (
 type Resolver struct {
 	Version string
 }
+
+var hardTimeout = time.Second * 50
 
 const (
 	TypeDNS  = 1
@@ -52,6 +55,8 @@ type CombinedResult struct {
 }
 
 func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
+	ctx, cancel := context.WithTimeout(context.Background(), hardTimeout)
+	defer cancel()
 	st := time.Now()
 	tmp := new(CombinedResult)
 	tmp.Type = req.Type
@@ -62,7 +67,7 @@ func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
 		if !ok {
 			tmp.Err = "Error parsing request"
 		} else {
-			tmp.Result = DNSImpl(&args)
+			tmp.Result = DNSImpl(ctx, &args)
 		}
 	case TypeMTR:
 		//Run MTR and populate result
@@ -70,7 +75,7 @@ func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
 		if !ok {
 			tmp.Err = "Error parsing request"
 		} else {
-			tmp.Result = MtrImpl(&args)
+			tmp.Result = MtrImpl(ctx, &args)
 		}
 	case TypeCurl:
 		//Run curl and populate result
@@ -78,7 +83,7 @@ func (r *Resolver) Combined(req *CombinedRequest, out *CombinedResult) error {
 		if !ok {
 			tmp.Err = "Error parsing request"
 		} else {
-			tmp.Result = CurlImpl(&args)
+			tmp.Result = CurlImpl(ctx, &args)
 		}
 	default:
 		//ERR
